@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as profileService from '../services/profile.service';
+import * as reviewsService from '../services/reviews.service';
+import type { ProviderReviewsQuery } from '../schemas/reviews.schema';
 
 // ── GET /profiles/me ──────────────────────────────────────────────────────────
 
@@ -84,6 +86,26 @@ export async function getCustomer(req: Request, res: Response, next: NextFunctio
   try {
     const profile = await profileService.getPublicCustomerProfile(req.params.userId);
     res.json({ profile });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── GET /profiles/providers/:userId/reviews ───────────────────────────────────
+
+export async function listProviderReviews(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const query = (req as Request & { parsedQuery: ProviderReviewsQuery }).parsedQuery;
+    const { reviews, nextCursor } = await reviewsService.getProviderReviews(
+      req.params.userId,
+      query.cursor,
+      query.limit
+    );
+    res.json({ reviews, nextCursor });
   } catch (err) {
     next(err);
   }

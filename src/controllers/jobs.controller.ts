@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as jobService from '../services/job.service';
 import * as jobRepo from '../repositories/job.repo';
+import * as reviewsService from '../services/reviews.service';
 
 // ── Create Job (draft) ────────────────────────────────────────────────────────
 
@@ -215,6 +216,21 @@ export async function cancel(req: Request, res: Response, next: NextFunction): P
     const job = await jobService.cancelJob(req.user!.userId, req.params.id, cancellation_reason ?? '');
     const { exact_address_enc, ...safeJob } = job as typeof job & { exact_address_enc: unknown };
     res.json({ job: safeJob });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Submit Review (Customer) ──────────────────────────────────────────────────
+
+export async function submitReview(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const review = await reviewsService.submitReview(
+      req.user!.userId,
+      req.params.id,
+      req.body
+    );
+    res.status(201).json({ review });
   } catch (err) {
     next(err);
   }

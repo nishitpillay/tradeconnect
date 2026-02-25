@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as jobsCtrl from '../controllers/jobs.controller';
+import * as reviewsCtrl from '../controllers/reviews.controller';
 import { validate, validateQuery } from '../middleware/validate.middleware';
 import { requireAuth, requireActive } from '../middleware/auth.middleware';
 import { requireRole, requireEmailVerified } from '../middleware/rbac.middleware';
@@ -17,6 +18,7 @@ import {
   SubmitQuoteSchema,
   QuoteActionSchema,
 } from '../schemas/job.schema';
+import { CreateReviewSchema } from '../schemas/reviews.schema';
 
 const router = Router();
 
@@ -122,6 +124,20 @@ router.get(
 router.get(
   '/:id/quotes',
   jobsCtrl.listQuotes
+);
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+
+router.post(
+  '/:id/reviews',
+  requireRole('customer'),
+  validate(CreateReviewSchema),
+  jobsCtrl.submitReview
+);
+
+router.get(
+  '/:id/reviews',
+  reviewsCtrl.listJobReviews
 );
 
 export default router;

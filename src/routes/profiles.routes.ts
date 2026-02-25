@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as profilesCtrl from '../controllers/profiles.controller';
-import { validate } from '../middleware/validate.middleware';
+import { validate, validateQuery } from '../middleware/validate.middleware';
 import { requireAuth, requireActive } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import {
@@ -10,12 +10,19 @@ import {
   ToggleAvailabilitySchema,
 } from '../schemas/profile.schema';
 import { UpdateNotificationPrefsSchema } from '../schemas/auth.schema';
+import { ProviderReviewsQuerySchema } from '../schemas/reviews.schema';
 
 const router = Router();
 
 // ── Public routes (no auth required) ─────────────────────────────────────────
 
 router.get('/providers/:userId', profilesCtrl.getProvider);
+
+router.get(
+  '/providers/:userId/reviews',
+  validateQuery(ProviderReviewsQuerySchema),
+  profilesCtrl.listProviderReviews
+);
 
 // ── Authenticated routes ───────────────────────────────────────────────────────
 

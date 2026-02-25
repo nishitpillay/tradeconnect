@@ -20,11 +20,15 @@ import { Server as SocketIOServer } from 'socket.io';
 import { env } from './config/env';
 import { db } from './config/database';
 import { redis } from './config/redis';
+import { setIo } from './config/socket';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { requestIdMiddleware } from './middleware/auth.middleware';
 import authRoutes from './routes/auth.routes';
 import jobsRoutes from './routes/jobs.routes';
 import profilesRoutes from './routes/profiles.routes';
+import messagingRoutes from './routes/messaging.routes';
+import reviewsRoutes from './routes/reviews.routes';
+import disputesRoutes from './routes/disputes.routes';
 
 // ── Express App ───────────────────────────────────────────────────────────────
 
@@ -92,6 +96,9 @@ app.get('/health', async (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/profiles', profilesRoutes);
+app.use('/api/conversations', messagingRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/disputes', disputesRoutes);
 
 // 404 catch-all
 app.use((_req: Request, res: Response) => {
@@ -115,6 +122,9 @@ const io = new SocketIOServer(server, {
   },
   transports: ['websocket', 'polling'],
 });
+
+// Make io available to services (e.g. messaging.service) via singleton
+setIo(io);
 
 // Basic auth guard for WebSocket connections
 io.use((socket, next) => {
