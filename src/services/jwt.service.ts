@@ -57,15 +57,14 @@ export async function rotateRefreshToken(oldRaw: string): Promise<{
   const { rows } = await db.query<{
     user_id: string;
     role: 'customer' | 'provider' | 'admin';
-    email_verified_at: Date | null;
-    identity_verified_at: Date | null;
-    revoked_at: Date | null;
+    email_verified: boolean;
+    identity_verified: boolean | null;
     expires_at: Date;
     used_at: Date | null;
   }>(
-    `SELECT at.user_id, at.revoked_at, at.expires_at, at.used_at,
-            u.role, u.email_verified_at,
-            pp.identity_verified_at
+    `SELECT at.user_id, at.expires_at, at.used_at,
+            u.role, u.email_verified,
+            pp.identity_verified
      FROM auth_tokens at
      JOIN users u ON u.id = at.user_id
      LEFT JOIN provider_profiles pp ON pp.user_id = u.id
@@ -82,7 +81,6 @@ export async function rotateRefreshToken(oldRaw: string): Promise<{
     await revokeAllUserTokens(row.user_id);
     throw new TokenError('Refresh token reuse detected');
   }
-  if (row.revoked_at) throw new TokenError('Refresh token revoked');
   if (new Date() > row.expires_at) throw new TokenError('Refresh token expired');
 
   // Mark old token as used atomically
@@ -94,8 +92,8 @@ export async function rotateRefreshToken(oldRaw: string): Promise<{
   const payload: JWTPayload = {
     userId: row.user_id,
     role: row.role,
-    email_verified: row.email_verified_at !== null,
-    identity_verified: row.identity_verified_at !== null,
+    email_verified: row.email_verified,
+    identity_verified: row.identity_verified ?? false,
   };
 
   const [accessToken, refreshToken] = await Promise.all([
@@ -109,8 +107,8 @@ export async function rotateRefreshToken(oldRaw: string): Promise<{
 export async function revokeRefreshToken(rawToken: string): Promise<void> {
   const hash = hashToken(rawToken);
   await db.query(
-    `UPDATE auth_tokens SET revoked_at = NOW()
-     WHERE token_hash = $1 AND token_type = 'refresh'`,
+    `UPDATE auth_tokens SET used_at = NOW()
+     WHERE token_hash = $1 AND token_type = 'refresh' AND used_at IS NULL`,
     [hash]
   );
 }
@@ -118,8 +116,8 @@ export async function revokeRefreshToken(rawToken: string): Promise<void> {
 /** Revoke ALL refresh tokens for a user (password change, compromise). */
 export async function revokeAllUserTokens(userId: string): Promise<void> {
   await db.query(
-    `UPDATE auth_tokens SET revoked_at = NOW()
-     WHERE user_id = $1 AND token_type = 'refresh' AND revoked_at IS NULL`,
+    `UPDATE auth_tokens SET used_at = NOW()
+     WHERE user_id = $1 AND token_type = 'refresh' AND used_at IS NULL`,
     [userId]
   );
   // Redis flag lets auth middleware reject cached JWTs issued before this moment
