@@ -110,6 +110,38 @@ export async function updateNotificationPrefs(
   return rows[0] ?? null;
 }
 
+// ── Provider verification flags ───────────────────────────────────────────────
+
+export async function updateProviderVerificationFlags(
+  providerId: string,
+  flags: {
+    identity_verified?:  boolean;
+    license_verified?:   boolean;
+    insurance_verified?: boolean;
+    abn_verified?:       boolean;
+    verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
+  }
+): Promise<void> {
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(flags)) {
+    if (val !== undefined) {
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(val);
+    }
+  }
+
+  if (setClauses.length === 0) return;
+
+  values.push(providerId);
+  await q.query(
+    `UPDATE provider_profiles SET ${setClauses.join(', ')} WHERE user_id = $${idx}`,
+    values
+  );
+}
+
 // ── Public profile queries ─────────────────────────────────────────────────────
 
 export interface PublicProviderProfile {
