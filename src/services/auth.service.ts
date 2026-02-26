@@ -93,15 +93,22 @@ export async function register(input: RegisterInput): Promise<{
     return newUser;
   });
 
-  // Send email verification link (fire-and-forget)
-  sendEmailVerification(user.id, user.email);
+  // In development, auto-verify email so users can post jobs immediately
+  const isDev = process.env.NODE_ENV === 'development';
+  if (isDev) {
+    await db.query('UPDATE users SET email_verified = TRUE WHERE id = $1', [user.id]);
+    user.email_verified = true;
+  } else {
+    // Send email verification link (fire-and-forget)
+    sendEmailVerification(user.id, user.email);
+  }
 
   writeLog({ action: 'user_created', actorId: user.id, targetType: 'user', targetId: user.id });
 
   const payload: JWTPayload = {
     userId: user.id,
     role: user.role,
-    email_verified: false,
+    email_verified: isDev ? true : false,
     identity_verified: false,
   };
 
