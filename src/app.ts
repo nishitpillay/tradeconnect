@@ -29,6 +29,7 @@ import profilesRoutes from './routes/profiles.routes';
 import messagingRoutes from './routes/messaging.routes';
 import reviewsRoutes from './routes/reviews.routes';
 import disputesRoutes from './routes/disputes.routes';
+import notificationsRoutes from './routes/notifications.routes';
 
 // ── Express App ───────────────────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ app.use('/api/profiles', profilesRoutes);
 app.use('/api/conversations', messagingRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/disputes', disputesRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // 404 catch-all
 app.use((_req: Request, res: Response) => {
