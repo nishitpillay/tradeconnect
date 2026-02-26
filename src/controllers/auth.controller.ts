@@ -13,6 +13,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
     res.status(201).json({
       user: sanitiseUser(user),
       access_token,
+      refresh_token, // included for mobile clients that can't use cookies
     });
   } catch (err) {
     next(err);
@@ -29,6 +30,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     res.json({
       user: sanitiseUser(user),
       access_token,
+      refresh_token, // included for mobile clients that can't use cookies
     });
   } catch (err) {
     next(err);
@@ -39,7 +41,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const token = req.cookies?.refresh_token as string | undefined;
+    const token =
+      (req.cookies?.refresh_token as string | undefined) ||
+      (req.body?.refresh_token as string | undefined);
 
     if (token) {
       await authService.logout(token);
@@ -68,7 +72,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     const { access_token, refresh_token } = await authService.refreshTokens(rawToken);
 
     res.cookie('refresh_token', refresh_token, cookieOptions());
-    res.json({ access_token });
+    res.json({ access_token, refresh_token });
   } catch (err) {
     next(err);
   }
