@@ -13,7 +13,7 @@ type QueryRunner = {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type UserRole   = 'customer' | 'provider' | 'admin';
-export type UserStatus = 'active' | 'suspended' | 'deleted' | 'pending_verification';
+export type UserStatus = 'active' | 'suspended' | 'banned' | 'deleted' | 'pending_verification';
 
 export interface User {
   id: string;

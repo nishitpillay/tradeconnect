@@ -31,6 +31,7 @@ import reviewsRoutes from './routes/reviews.routes';
 import disputesRoutes from './routes/disputes.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import verificationsRoutes from './routes/verifications.routes';
+import adminRoutes from './routes/admin.routes';
 
 // ── Express App ───────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/disputes', disputesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/verifications', verificationsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 catch-all
 app.use((_req: Request, res: Response) => {
