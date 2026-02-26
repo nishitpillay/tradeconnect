@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as jobService from '../services/job.service';
 import * as jobRepo from '../repositories/job.repo';
 import * as reviewsService from '../services/reviews.service';
+import type { JobFeedQuery, MyJobsQuery } from '../schemas/job.schema';
 
 // ── Create Job (draft) ────────────────────────────────────────────────────────
 
@@ -25,29 +26,41 @@ export async function publish(req: Request, res: Response, next: NextFunction): 
   }
 }
 
+// ── List My Jobs (Customer) ───────────────────────────────────────────────────
+
+export async function myJobs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const query = (req as Request & { parsedQuery: MyJobsQuery }).parsedQuery;
+    const result = await jobService.listMyJobs(req.user!.userId, query);
+    // Strip encrypted address blobs from all jobs
+    const jobs = result.jobs.map(({ exact_address_enc, ...j }) => j);
+    res.json({ jobs, nextCursor: result.nextCursor });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── List (Provider Feed) ──────────────────────────────────────────────────────
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const query = req.query as {
-      category_id?: string;
-      max_distance_km?: string;
-      budget_min?: string;
-      budget_max?: string;
-      cursor?: string;
-      limit?: string;
-    };
+    const query = (req as Request & { parsedQuery: JobFeedQuery }).parsedQuery;
 
     const { jobs, nextCursor } = await jobService.getProviderFeed(req.user!.userId, {
       category_id:     query.category_id,
-      max_distance_km: query.max_distance_km ? Number(query.max_distance_km) : undefined,
-      budget_min:      query.budget_min      ? Number(query.budget_min)      : undefined,
-      budget_max:      query.budget_max      ? Number(query.budget_max)      : undefined,
+      state:           query.state,
+      urgency:         query.urgency,
+      max_distance_km: query.radius_km,
+      budget_min:      query.budget_min,
+      budget_max:      query.budget_max,
+      sort:            query.sort,
       cursor:          query.cursor,
-      limit:           query.limit           ? Number(query.limit)           : undefined,
+      limit:           query.limit,
     });
 
-    res.json({ jobs, nextCursor });
+    // Strip encrypted address blobs
+    const safeJobs = jobs.map(({ exact_address_enc, ...j }) => j);
+    res.json({ jobs: safeJobs, nextCursor });
   } catch (err) {
     next(err);
   }
@@ -132,7 +145,7 @@ export async function listQuotes(req: Request, res: Response, next: NextFunction
 
 export async function award(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { quote_id } = req.body as { quote_id: string };
+    const { quote_id } = req.body as { quote_id: string };  // validated by AwardJobSchema
     const { job, revealed_address } = await jobService.awardJob(
       req.user!.userId,
       req.params.id,

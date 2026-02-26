@@ -17,6 +17,8 @@ import {
   JobFeedQuerySchema,
   SubmitQuoteSchema,
   QuoteActionSchema,
+  AwardJobSchema,
+  MyJobsQuerySchema,
 } from '../schemas/job.schema';
 import { CreateReviewSchema } from '../schemas/reviews.schema';
 
@@ -24,6 +26,15 @@ const router = Router();
 
 // All job routes require authentication and an active account
 router.use(requireAuth, requireActive);
+
+// ── Customer: List own jobs ───────────────────────────────────────────────────
+
+router.get(
+  '/',
+  requireRole('customer'),
+  validateQuery(MyJobsQuerySchema),
+  jobsCtrl.myJobs
+);
 
 // ── Customer: Create & manage their own jobs ──────────────────────────────────
 
@@ -53,6 +64,7 @@ router.patch(
 router.post(
   '/:id/award',
   requireRole('customer'),
+  validate(AwardJobSchema),
   jobsCtrl.award
 );
 

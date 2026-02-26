@@ -236,6 +236,31 @@ export const QuoteActionSchema = z
 
 export type QuoteActionInput = z.infer<typeof QuoteActionSchema>;
 
+// ─── Award Job ────────────────────────────────────────────────────────────────
+
+export const AwardJobSchema = z
+  .object({
+    quote_id: z.string().uuid('quote_id must be a valid UUID'),
+  })
+  .strict();
+
+export type AwardJobInput = z.infer<typeof AwardJobSchema>;
+
+// ─── My Jobs Query (customer) ─────────────────────────────────────────────────
+
+export const MyJobsQuerySchema = z
+  .object({
+    status: z.enum([
+      'draft', 'posted', 'quoting', 'awarded', 'in_progress',
+      'completed', 'cancelled', 'expired',
+    ]).optional(),
+    cursor: z.string().optional(),
+    limit:  z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export type MyJobsQuery = z.infer<typeof MyJobsQuerySchema>;
+
 // ─── Report ───────────────────────────────────────────────────────────────────
 
 export const ReportSchema = z

@@ -317,6 +317,15 @@ export async function getProviderFeed(
   return jobRepo.findProviderFeed({ ...query, provider_id: providerId });
 }
 
+// ── List My Jobs (Customer) ───────────────────────────────────────────────────
+
+export async function listMyJobs(
+  customerId: string,
+  query: { status?: string; cursor?: string; limit: number }
+): Promise<{ jobs: Job[]; nextCursor: string | null }> {
+  return jobRepo.findJobsByCustomerPaginated(customerId, query);
+}
+
 // ── Quote Actions (Customer) ──────────────────────────────────────────────────
 
 export async function viewQuote(

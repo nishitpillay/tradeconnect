@@ -134,9 +134,12 @@ export interface CreateQuoteInput {
 export interface FeedQuery {
   provider_id: string;
   category_id?: string;
+  state?: string;
+  urgency?: string[];
   max_distance_km?: number;
   budget_min?: number;
   budget_max?: number;
+  sort?: 'recommended' | 'newest' | 'budget_high' | 'budget_low' | 'distance';
   cursor?: string;   // base64-encoded { created_at, id }
   limit?: number;
 }
@@ -216,6 +219,46 @@ export async function findJobsByCustomer(customerId: string): Promise<Job[]> {
     [customerId]
   );
   return rows;
+}
+
+export async function findJobsByCustomerPaginated(
+  customerId: string,
+  query: { status?: string; cursor?: string; limit: number }
+): Promise<{ jobs: Job[]; nextCursor: string | null }> {
+  const pageSize = Math.min(query.limit, 50);
+  const conditions: string[] = ['customer_id = $1'];
+  const values: (string | number)[] = [customerId];
+  let idx = 2;
+
+  if (query.status) {
+    conditions.push(`status = $${idx++}`);
+    values.push(query.status);
+  }
+
+  if (query.cursor) {
+    const decoded = decodeCursor(query.cursor);
+    if (decoded) {
+      conditions.push(
+        `(created_at < $${idx} OR (created_at = $${idx + 1} AND id > $${idx + 2}))`
+      );
+      idx += 3;
+      values.push(decoded.created_at, decoded.created_at, decoded.id);
+    }
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const { rows } = await db.query<Job>(
+    `SELECT * FROM jobs ${where} ORDER BY created_at DESC, id ASC LIMIT $${idx}`,
+    [...values, pageSize + 1]
+  );
+
+  const hasMore = rows.length > pageSize;
+  const jobs = hasMore ? rows.slice(0, pageSize) : rows;
+  const last = jobs[jobs.length - 1];
+  const nextCursor = hasMore && last
+    ? encodeCursor({ created_at: last.created_at.toISOString(), id: last.id })
+    : null;
+  return { jobs, nextCursor };
 }
 
 export async function patchJob(
@@ -336,6 +379,17 @@ export async function findProviderFeed(query: FeedQuery): Promise<{
     values.push(query.category_id);
   }
 
+  if (query.state) {
+    conditions.push(`j.state = $${idx++}`);
+    values.push(query.state);
+  }
+
+  if (query.urgency && query.urgency.length > 0) {
+    const placeholders = query.urgency.map(() => `$${idx++}`).join(', ');
+    conditions.push(`j.urgency IN (${placeholders})`);
+    values.push(...query.urgency);
+  }
+
   if (query.budget_min != null) {
     conditions.push(`(j.budget_max IS NULL OR j.budget_max >= $${idx++})`);
     values.push(query.budget_min);
@@ -357,11 +411,27 @@ export async function findProviderFeed(query: FeedQuery): Promise<{
     }
   }
 
+  // Sort order
+  const orderBy = (() => {
+    switch (query.sort) {
+      case 'budget_high': return 'j.budget_max DESC NULLS LAST, j.published_at DESC, j.id ASC';
+      case 'budget_low':  return 'j.budget_min ASC NULLS LAST, j.published_at DESC, j.id ASC';
+      case 'distance':
+        return provLocation && provLocation !== 'POINT EMPTY'
+          ? `ST_Distance(j.job_location, (SELECT service_location FROM provider_profiles WHERE user_id = '${query.provider_id}')) ASC, j.published_at DESC, j.id ASC`
+          : 'j.published_at DESC, j.id ASC';
+      case 'newest':
+      case 'recommended':
+      default:
+        return 'j.published_at DESC, j.id ASC';
+    }
+  })();
+
   const where = conditions.join(' AND ');
   const { rows } = await db.query<Job>(
     `SELECT j.* FROM jobs j
      WHERE ${where}
-     ORDER BY j.published_at DESC, j.id ASC
+     ORDER BY ${orderBy}
      LIMIT $${idx}`,
     [...values, limit + 1]
   );
