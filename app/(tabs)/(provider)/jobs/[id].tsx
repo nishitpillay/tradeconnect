@@ -10,6 +10,7 @@ import { useSessionStore } from '../../../../src/stores/sessionStore';
 import { Button } from '../../../../src/components/ui/Button';
 import { Card } from '../../../../src/components/ui/Card';
 import { StatusPill } from '../../../../src/components/ui/StatusPill';
+import { getFeaturedCategoryById } from '../../../../src/content/categories';
 
 type QuoteType = 'fixed' | 'estimate_range' | 'hourly' | 'call_for_quote';
 
@@ -81,6 +82,9 @@ function SubmitQuoteForm({ jobId, onSuccess }: { jobId: string; onSuccess: () =>
   return (
     <Card style={styles.formCard}>
       <Text style={styles.formTitle}>Submit Your Quote</Text>
+      <Text style={styles.formHelp}>
+        Use fixed for clearly scoped work, range when the site needs inspection, hourly for open-ended jobs, or call for quote when you need to discuss the job first.
+      </Text>
 
       {/* Quote type selector */}
       <Text style={styles.fieldLabel}>Quote type</Text>
@@ -214,6 +218,7 @@ export default function ProviderJobDetailScreen() {
   const canSubmitQuote = !myQuote && (job?.status === 'posted' || job?.status === 'quoting');
   const myQuoteAwarded = myQuote?.status === 'awarded';
   const canAccept = myQuoteAwarded && job?.status === 'awarded';
+  const category = job ? getFeaturedCategoryById(job.category_id) : undefined;
 
   const handleAccept = async () => {
     if (!job) return;
@@ -257,6 +262,13 @@ export default function ProviderJobDetailScreen() {
       <Card style={styles.section}>
         <Text style={styles.description}>{job.description}</Text>
         <View style={styles.detailGrid}>
+          {category ? (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Category</Text>
+              <Text style={styles.detailValue}>{category.name}</Text>
+              <Text style={styles.detailHelp}>{category.short}</Text>
+            </View>
+          ) : null}
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Location</Text>
             <Text style={styles.detailValue}>{job.suburb}, {job.state}</Text>
@@ -362,12 +374,14 @@ const styles = StyleSheet.create({
   detailItem: {},
   detailLabel: { fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue: { fontSize: 14, color: '#111827', fontWeight: '500', marginTop: 2 },
+  detailHelp: { fontSize: 12, color: '#6B7280', marginTop: 4, lineHeight: 18 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 8 },
   quoteHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   quotePrice: { fontSize: 18, fontWeight: '700', color: '#3B82F6' },
   scopeNotes: { fontSize: 13, color: '#6B7280', marginTop: 8 },
   formCard: { marginBottom: 16 },
   formTitle: { fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 12 },
+  formHelp: { fontSize: 13, color: '#6B7280', lineHeight: 19, marginBottom: 6 },
   fieldLabel: { fontSize: 13, color: '#374151', fontWeight: '500', marginBottom: 4, marginTop: 10 },
   typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
   typeButton: { marginBottom: 4 },

@@ -9,6 +9,7 @@ import { quotesAPI } from '../../../../src/api/quotes.api';
 import { Button } from '../../../../src/components/ui/Button';
 import { Card } from '../../../../src/components/ui/Card';
 import { StatusPill } from '../../../../src/components/ui/StatusPill';
+import { getFeaturedCategoryById } from '../../../../src/content/categories';
 import type { Quote } from '../../../../src/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,6 +181,7 @@ export default function CustomerJobDetailScreen() {
 
   const canCancel = job.status === 'draft' || job.status === 'posted' || job.status === 'quoting';
   const canComplete = job.status === 'in_progress';
+  const category = getFeaturedCategoryById(job.category_id);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -195,6 +197,13 @@ export default function CustomerJobDetailScreen() {
       <Card style={styles.section}>
         <Text style={styles.description}>{job.description}</Text>
         <View style={styles.detailGrid}>
+          {category ? (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Category</Text>
+              <Text style={styles.detailValue}>{category.name}</Text>
+              <Text style={styles.detailHelp}>{category.short}</Text>
+            </View>
+          ) : null}
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Location</Text>
             <Text style={styles.detailValue}>{job.suburb}, {job.state}</Text>
@@ -289,6 +298,7 @@ const styles = StyleSheet.create({
   detailItem: {},
   detailLabel: { fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue: { fontSize: 14, color: '#111827', fontWeight: '500', marginTop: 2 },
+  detailHelp: { fontSize: 12, color: '#6B7280', marginTop: 4, lineHeight: 18 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 12 },
   quoteCard: { marginBottom: 10 },
   quoteHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },

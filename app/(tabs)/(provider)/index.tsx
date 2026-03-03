@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Card } from '../../../src/components/ui/Card';
 import { Badge } from '../../../src/components/ui/Badge';
 import { jobsAPI } from '../../../src/api/jobs.api';
+import { FEATURED_CATEGORIES, getFeaturedCategoryById } from '../../../src/content/categories';
 import type { Job, JobFeedResponse } from '../../../src/types';
 
 export default function ProviderFeedScreen() {
   const router = useRouter();
+  const previewCategories = FEATURED_CATEGORIES.slice(0, 4);
 
   const {
     data,
@@ -55,6 +57,11 @@ export default function ProviderFeedScreen() {
       <Text style={styles.jobDescription} numberOfLines={2}>
         {item.description}
       </Text>
+      {getFeaturedCategoryById(item.category_id) ? (
+        <Text style={styles.jobCategoryCopy} numberOfLines={2}>
+          {getFeaturedCategoryById(item.category_id)?.short}
+        </Text>
+      ) : null}
       <View style={styles.jobFooter}>
         <View>
           <Text style={styles.jobLocation}>{item.suburb}, {item.state}</Text>
@@ -89,6 +96,30 @@ export default function ProviderFeedScreen() {
         data={jobs}
         renderItem={renderJobCard}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTitle}>Browse by trade</Text>
+            <Text style={styles.headerText}>
+              Use the category notes below to judge fit quickly before opening a job.
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
+              style={styles.categoryScroller}
+            >
+              {previewCategories.map((category) => (
+                <View key={category.id} style={styles.categoryCard}>
+                  <Text style={styles.categoryBadge}>{category.icon}</Text>
+                  <Text style={styles.categoryName}>{category.name}</Text>
+                  <Text style={styles.categoryCopy} numberOfLines={3}>
+                    {category.short}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        }
         contentContainerStyle={styles.list}
         onEndReached={() => hasNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
@@ -109,6 +140,53 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
   },
+  headerBlock: {
+    marginBottom: 18,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  headerText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  categoryScroller: {
+    marginBottom: 6,
+  },
+  categoryRow: {
+    gap: 12,
+    paddingRight: 4,
+  },
+  categoryCard: {
+    width: 220,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+  },
+  categoryBadge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2563EB',
+    marginBottom: 10,
+  },
+  categoryName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  categoryCopy: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
   card: {
     marginBottom: 12,
   },
@@ -128,8 +206,14 @@ const styles = StyleSheet.create({
   jobDescription: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 12,
+    marginBottom: 8,
     lineHeight: 20,
+  },
+  jobCategoryCopy: {
+    fontSize: 12,
+    color: '#4B5563',
+    lineHeight: 18,
+    marginBottom: 10,
   },
   jobFooter: {
     flexDirection: 'row',
