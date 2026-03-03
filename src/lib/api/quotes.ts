@@ -1,22 +1,12 @@
 import { apiClient } from './client';
+import type { SubmitQuoteInput } from '@tradeconnect/shared/schemas/quote.schema';
 import { Quote } from '@/types';
 
 export const quotesAPI = {
   // Provider: submit a quote on a specific job (prices in AUD cents)
-  async submitQuote(jobId: string, data: {
-    quote_type: 'fixed' | 'estimate_range' | 'hourly' | 'call_for_quote';
-    price_fixed?: number;
-    price_min?: number;
-    price_max?: number;
-    hourly_rate?: number;
-    is_gst_included?: boolean;
-    scope_notes?: string;
-    inclusions?: string;
-    exclusions?: string;
-    timeline_days?: number;
-    warranty_months?: number;
-  }): Promise<Quote> {
-    return apiClient.post<Quote>(`/jobs/${jobId}/quotes`, data);
+  async submitQuote(jobId: string, data: SubmitQuoteInput): Promise<Quote> {
+    const res = await apiClient.post<{ quote: Quote }>(`/jobs/${jobId}/quotes`, data);
+    return res.quote;
   },
 
   // Provider: list own quotes
@@ -41,11 +31,13 @@ export const quotesAPI = {
 
   // Customer: list all quotes for a job
   async getQuotesForJob(jobId: string): Promise<Quote[]> {
-    return apiClient.get<Quote[]>(`/jobs/${jobId}/quotes`);
+    const res = await apiClient.get<{ quotes: Quote[] }>(`/jobs/${jobId}/quotes`);
+    return res.quotes;
   },
 
   // Customer: shortlist or reject a specific quote
   async quoteAction(jobId: string, quoteId: string, action: 'shortlisted' | 'rejected'): Promise<Quote> {
-    return apiClient.patch<Quote>(`/jobs/${jobId}/quotes/${quoteId}`, { action });
+    const res = await apiClient.patch<{ quote: Quote }>(`/jobs/${jobId}/quotes/${quoteId}`, { action });
+    return res.quote;
   },
 };

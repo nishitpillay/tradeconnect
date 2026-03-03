@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { authAPI } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
-import { RegisterSchema } from '@/schemas/auth.schema';
+import { RegisterSchema } from '@tradeconnect/shared/schemas/auth.schema';
 import { UserRole } from '@/types';
 import { socketClient } from '@/lib/socket/client';
 import clsx from 'clsx';
@@ -40,11 +40,15 @@ export default function RegisterPage() {
     }
 
     // Validate with Zod
+    const normalizedPhone = phone
+      ? (phone.startsWith('0') ? `+61${phone.slice(1)}` : phone)
+      : undefined;
+
     const result = RegisterSchema.safeParse({
       email,
       password,
       full_name: fullName,
-      phone,
+      phone: normalizedPhone,
       role,
       business_name: role === 'provider' ? businessName : undefined,
       terms_accepted: termsAccepted || undefined,
@@ -66,20 +70,17 @@ export default function RegisterPage() {
 
     try {
       // Convert AU phone 04XXXXXXXX → +614XXXXXXX for backend
-      const e164Phone = phone.startsWith('0')
-        ? '+61' + phone.slice(1)
-        : phone;
-
       const response = await authAPI.register({
         email,
         password,
         full_name: fullName,
-        phone: e164Phone,
+        phone: normalizedPhone,
         role: role as UserRole,
         business_name: role === 'provider' ? businessName : undefined,
         terms_accepted: true,
         privacy_accepted: true,
-      } as any);
+        marketing_consent: false,
+      });
 
       // Store auth data
       setUser(response.user);
@@ -200,7 +201,7 @@ export default function RegisterPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errors.password}
-          helperText="Min 8 characters, uppercase, lowercase, and number"
+          helperText="Min 8 characters, with an uppercase letter, number, and special character"
           required
           autoComplete="new-password"
         />

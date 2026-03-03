@@ -5,12 +5,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
-
-const ForgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
-});
+import { ForgotPasswordSchema } from '@tradeconnect/shared/schemas/auth.schema';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -93,10 +89,9 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                error={!!errors.email}
+                error={errors.email}
                 disabled={isLoading}
               />
-              {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
             </div>
 
             <Button type="submit" className="w-full" isLoading={isLoading} disabled={isLoading}>

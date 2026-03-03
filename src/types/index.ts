@@ -6,11 +6,13 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  display_name?: string | null;
   phone: string | null;
   role: UserRole;
   status: UserStatus;
   email_verified: boolean;
   phone_verified: boolean;
+  timezone?: string | null;
   created_at: string;
   updated_at: string;
   avatar_url?: string;
@@ -41,9 +43,11 @@ export interface Job {
   state: string;
   approximate_address?: string;
   exact_address?: string;
+  budget_range?: string | null;
   budget_min: number | null;
   budget_max: number | null;
   budget_is_gst: boolean;
+  preferred_date?: string | null;
   preferred_start_date: string | null;
   awarded_provider_id: string | null;
   awarded_quote_id: string | null;

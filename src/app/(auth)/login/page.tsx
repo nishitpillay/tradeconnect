@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { authAPI } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
-import { LoginSchema } from '@/schemas/auth.schema';
+import { LoginSchema } from '@tradeconnect/shared/schemas/auth.schema';
 import { socketClient } from '@/lib/socket/client';
 
 export default function LoginPage() {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     const result = LoginSchema.safeParse({ email: formEmail, password: formPassword });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
+      result.error.errors.forEach((err: { path: (string | number)[]; message: string }) => {
         if (err.path[0]) {
           fieldErrors[err.path[0] as string] = err.message;
         }

@@ -233,7 +233,7 @@ function QuoteCard({
 }) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
-  const canAct = jobStatus === 'open' || jobStatus === 'quoting';
+  const canAct = jobStatus === 'posted' || jobStatus === 'quoting';
 
   const handleAction = async (action: 'shortlisted' | 'rejected' | 'award') => {
     setLoadingAction(action);
@@ -378,7 +378,7 @@ export default function JobDetailPage() {
     );
   }
 
-  const canSubmitQuote = isProvider && !myQuote && (job.status === 'open' || job.status === 'quoting');
+  const canSubmitQuote = isProvider && !myQuote && (job.status === 'posted' || job.status === 'quoting');
   const myQuoteAwarded = myQuote?.status === 'awarded';
   const canAcceptJob = isProvider && myQuoteAwarded && job.status === 'awarded';
 
@@ -416,7 +416,7 @@ export default function JobDetailPage() {
                 Mark Complete
               </Button>
             )}
-            {(job.status === 'open' || job.status === 'quoting' || job.status === 'draft') && (
+            {(job.status === 'posted' || job.status === 'quoting' || job.status === 'draft') && (
               <Button
                 variant="danger"
                 onClick={() => handleJobAction('cancel')}

@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import { AuthResponse, User } from '@/types';
-import { LoginInput, RegisterInput } from '@/schemas/auth.schema';
+import { LoginInput, RegisterInput } from '@tradeconnect/shared/schemas/auth.schema';
 
 export const authAPI = {
   async login(data: LoginInput): Promise<AuthResponse> {
@@ -24,7 +24,7 @@ export const authAPI = {
   },
 
   async resetPassword(token: string, password: string): Promise<{ message: string }> {
-    return apiClient.post('/auth/reset-password', { token, password });
+    return apiClient.post('/auth/reset-password', { token, new_password: password });
   },
 
   async verifyEmail(token: string): Promise<{ message: string }> {

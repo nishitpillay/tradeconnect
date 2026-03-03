@@ -34,7 +34,7 @@ export default function ConversationPage() {
     queryKey: ['messages', id],
     queryFn: () => messagingAPI.getMessages(id),
     enabled: !!id,
-    select: (msgs) => msgs,
+    select: (msgs: Message[]) => msgs,
     onSuccess: (msgs: Message[]) => {
       setMessages(msgs);
       setTimeout(() => scrollToBottom(), 50);
