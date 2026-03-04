@@ -154,6 +154,30 @@ export interface ProviderProfile {
   user?: User;
 }
 
+export interface ProviderReviewSummary {
+  id: string;
+  rating: number | string;
+  body: string | null;
+  created_at: string;
+  reviewer_name: string;
+}
+
+export interface CategoryProvider {
+  user_id: string;
+  full_name: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  business_name: string | null;
+  bio: string | null;
+  years_experience: number | null;
+  avg_rating: number | string | null;
+  total_reviews: number;
+  jobs_completed: number;
+  available: boolean;
+  categories: string[];
+  recent_reviews: ProviderReviewSummary[];
+}
+
 export interface Notification {
   id: string;
   user_id: string;

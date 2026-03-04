@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { User, CustomerProfile, ProviderProfile } from '@/types';
+import type { User, CustomerProfile, ProviderProfile, CategoryProvider } from '@/types';
 
 export const profilesAPI = {
   getMe: async (): Promise<{
@@ -38,5 +38,9 @@ export const profilesAPI = {
 
   toggleAvailability: async (available: boolean): Promise<{ provider_profile: ProviderProfile }> => {
     return apiClient.patch('/profiles/me/availability', { available });
+  },
+
+  listProvidersByCategory: async (slug: string): Promise<{ providers: CategoryProvider[] }> => {
+    return apiClient.get(`/profiles/categories/${slug}/providers`);
   },
 };
