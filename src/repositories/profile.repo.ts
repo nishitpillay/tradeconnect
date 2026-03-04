@@ -286,21 +286,6 @@ export async function listProvidersByCategorySlug(
      ) recent_reviews ON TRUE
      WHERE jc.slug = $1
        AND u.status = 'active'
-     GROUP BY
-       pp.id,
-       pp.user_id,
-       u.full_name,
-       u.display_name,
-       u.avatar_url,
-       pp.business_name,
-       pp.bio,
-       pp.years_experience,
-       pp.avg_rating,
-       pp.total_reviews,
-       pp.jobs_completed,
-       pp.available,
-       categories.categories,
-       recent_reviews.reviews
      ORDER BY
        pp.available DESC,
        pp.avg_rating DESC NULLS LAST,
