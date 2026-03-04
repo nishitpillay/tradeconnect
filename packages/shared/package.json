@@ -1,0 +1,39 @@
+{
+  "name": "@tradeconnect/shared",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schemas/auth.schema": {
+      "types": "./dist/schemas/auth.schema.d.ts",
+      "default": "./dist/schemas/auth.schema.js"
+    },
+    "./schemas/job.schema": {
+      "types": "./dist/schemas/job.schema.d.ts",
+      "default": "./dist/schemas/job.schema.js"
+    },
+    "./schemas/quote.schema": {
+      "types": "./dist/schemas/quote.schema.d.ts",
+      "default": "./dist/schemas/quote.schema.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "type-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.6",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT"
+}
