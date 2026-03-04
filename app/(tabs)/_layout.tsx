@@ -16,35 +16,35 @@ export default function TabsLayout() {
         }}
       >
         <Tabs.Screen
-          name="(customer)"
+          name="(customer)/index"
           options={{
             title: 'My Jobs',
             tabBarIcon: ({ color, size }) => <Ionicons name="briefcase-outline" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="messages"
+          name="messages/index"
           options={{
             title: 'Messages',
             tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="notifications"
+          name="notifications/index"
           options={{
             title: 'Notifications',
             tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="profile"
+          name="profile/index"
           options={{
             title: 'Profile',
             tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
           }}
         />
         {/* Hide provider tabs */}
-        <Tabs.Screen name="(provider)" options={{ href: null }} />
+        <Tabs.Screen name="(provider)/index" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -59,29 +59,29 @@ export default function TabsLayout() {
         }}
       >
         <Tabs.Screen
-          name="(provider)"
+          name="(provider)/index"
           options={{
             title: 'Find Jobs',
             tabBarIcon: ({ color, size }) => <Ionicons name="search-outline" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="messages"
+          name="messages/index"
           options={{
             title: 'Messages',
             tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="profile"
+          name="profile/index"
           options={{
             title: 'Profile',
             tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
           }}
         />
         {/* Hide customer tabs */}
-        <Tabs.Screen name="(customer)" options={{ href: null }} />
-        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="(customer)/index" options={{ href: null }} />
+        <Tabs.Screen name="notifications/index" options={{ href: null }} />
       </Tabs>
     );
   }
