@@ -52,6 +52,18 @@ Detailed stack and architecture documentation is available in:
 
 - [TECH_STACK_OVERVIEW.md](./TECH_STACK_OVERVIEW.md)
 
+## Local Workspace Commands
+
+This repo also tracks helper scripts for running the local multi-repo workspace.
+
+- `npm run dev:all`
+  Starts the backend stack and Expo from your local TradeConnect workspace.
+- `npm run smoke:all`
+  Runs backend and web smoke checks, web type-check, and the mobile Android smoke test.
+
+By default the scripts expect the implementation repos to live in a sibling folder named `tradeconnect`.
+If your local path is different, set `TRADECONNECT_WORKSPACE_ROOT` before running them.
+
 ## Current Product Areas
 
 The current TradeConnect codebase covers:

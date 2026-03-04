@@ -1,0 +1,8 @@
+{
+  "name": "tradeconnect-main",
+  "private": true,
+  "scripts": {
+    "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "smoke:all": "powershell -ExecutionPolicy Bypass -File scripts/smoke-all.ps1"
+  }
+}
