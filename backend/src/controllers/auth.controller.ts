@@ -1,0 +1,189 @@
+import { Request, Response, NextFunction } from 'express';
+import * as authService from '../services/auth.service';
+import * as userRepo from '../repositories/user.repo';
+
+// ── Register ──────────────────────────────────────────────────────────────────
+
+export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user, access_token, refresh_token } = await authService.register(req.body);
+
+    // Refresh token in HttpOnly cookie; access token in body
+    res.cookie('refresh_token', refresh_token, cookieOptions());
+    res.status(201).json({
+      user: sanitiseUser(user),
+      access_token,
+      refresh_token, // included for mobile clients that can't use cookies
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+
+export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user, access_token, refresh_token } = await authService.login(req.body);
+
+    res.cookie('refresh_token', refresh_token, cookieOptions());
+    res.json({
+      user: sanitiseUser(user),
+      access_token,
+      refresh_token, // included for mobile clients that can't use cookies
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+
+export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token =
+      (req.cookies?.refresh_token as string | undefined) ||
+      (req.body?.refresh_token as string | undefined);
+
+    if (token) {
+      await authService.logout(token);
+    }
+
+    res.clearCookie('refresh_token', cookieOptions());
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+
+export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const rawToken =
+      (req.cookies?.refresh_token as string | undefined) ||
+      (req.body?.refresh_token as string | undefined);
+
+    if (!rawToken) {
+      res.status(401).json({ message: 'No refresh token provided' });
+      return;
+    }
+
+    const { access_token, refresh_token } = await authService.refreshTokens(rawToken);
+
+    res.cookie('refresh_token', refresh_token, cookieOptions());
+    res.json({ access_token, refresh_token });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Email Verification ────────────────────────────────────────────────────────
+
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token } = req.query as { token: string };
+    await authService.verifyEmail(token);
+    res.json({ message: 'Email verified successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.user!;
+    const user = await userRepo.findById(userId);
+    if (!user) { res.status(404).json({ message: 'User not found' }); return; }
+    await authService.sendEmailVerification(userId, user.email);
+    res.json({ message: 'Verification email sent' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Phone OTP ─────────────────────────────────────────────────────────────────
+
+export async function requestPhoneOTP(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { phone } = req.body as { phone: string };
+    await authService.requestPhoneOTP(phone, req.user!.userId);
+    res.json({ message: 'OTP sent' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyPhoneOTP(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { phone, otp } = req.body as { phone: string; otp: string };
+    await authService.verifyPhoneOTP(phone, otp, req.user!.userId);
+    res.json({ message: 'Phone verified successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Forgot / Reset Password ───────────────────────────────────────────────────
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body as { email: string };
+    await authService.forgotPassword(email);
+    // Always return 200 to prevent email enumeration
+    res.json({ message: 'If that email exists, a reset link has been sent' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token, new_password } = req.body as { token: string; new_password: string };
+    await authService.resetPassword(token, new_password);
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Me ────────────────────────────────────────────────────────────────────────
+
+export async function me(req: Request, res: Response): Promise<void> {
+  res.json({ user: req.user });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sanitiseUser(user: {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  full_name: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  created_at: Date;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    full_name: user.full_name,
+    email_verified: user.email_verified,
+    phone_verified: user.phone_verified,
+    created_at: user.created_at,
+  };
+}
+
+function cookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'strict' as const,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days ms
+    path: '/api/auth',
+  };
+}
