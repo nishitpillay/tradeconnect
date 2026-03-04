@@ -1,0 +1,27 @@
+node_modules/
+.expo/
+dist/
+!vendor/
+!vendor/tradeconnect-shared/
+!vendor/tradeconnect-shared/dist/
+!vendor/tradeconnect-shared/dist/**
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env.local
+.codex-temp/
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.log
+*.swp
+*.swo
+*~
