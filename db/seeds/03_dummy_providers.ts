@@ -4,7 +4,7 @@ import { CATEGORY_IDS } from './01_categories';
 
 const BCRYPT_ROUNDS = 12;
 
-const CATEGORY_FIXTURES = [
+export const CATEGORY_FIXTURES = [
   {
     key: 'plumbing',
     label: 'Plumbing',
@@ -112,7 +112,7 @@ function getDummyPassword(): string {
     ?? 'DemoPass123!';
 }
 
-function buildUuid(prefix: string, categoryIndex: number, providerIndex: number): string {
+export function buildUuid(prefix: string, categoryIndex: number, providerIndex: number): string {
   const categoryHex = (categoryIndex + 1).toString(16).padStart(2, '0');
   const providerHex = (providerIndex + 1).toString(16).padStart(2, '0');
   const middle = `${categoryHex}${providerHex}`;

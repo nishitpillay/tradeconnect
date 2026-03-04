@@ -21,6 +21,7 @@ import { Pool, PoolClient } from 'pg';
 import { seedCategories }         from './01_categories';
 import { seedAdminAndDemoUsers }  from './02_admin_user';
 import { seedDummyProviders }     from './03_dummy_providers';
+import { seedDummyCustomersAndReviews } from './04_dummy_customers_reviews';
 
 // ─── Seed registry ────────────────────────────────────────────────────────────
 
@@ -48,6 +49,12 @@ const SEEDS: SeedDefinition[] = [
     name:            '03_dummy_providers',
     description:     'Five dummy provider accounts for each featured category',
     fn:              seedDummyProviders,
+    runInProduction: false,
+  },
+  {
+    name:            '04_dummy_customers_reviews',
+    description:     'Twenty dummy customers plus ten seeded reviews per featured category',
+    fn:              seedDummyCustomersAndReviews,
     runInProduction: false,
   },
 ];
