@@ -80,6 +80,15 @@ export async function getProvider(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function listCategoryProviders(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const providers = await profileService.getCategoryProviders(req.params.slug);
+    res.json({ providers });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── GET /profiles/customers/:userId ──────────────────────────────────────────
 
 export async function getCustomer(req: Request, res: Response, next: NextFunction): Promise<void> {

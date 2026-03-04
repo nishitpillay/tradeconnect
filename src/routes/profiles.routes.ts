@@ -16,6 +16,7 @@ const router = Router();
 
 // ── Public routes (no auth required) ─────────────────────────────────────────
 
+router.get('/categories/:slug/providers', profilesCtrl.listCategoryProviders);
 router.get('/providers/:userId', profilesCtrl.getProvider);
 
 router.get(

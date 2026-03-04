@@ -119,6 +119,10 @@ export async function getPublicProviderProfile(userId: string) {
   return profile;
 }
 
+export async function getCategoryProviders(slug: string) {
+  return profileRepo.listProvidersByCategorySlug(slug);
+}
+
 // ── GET /profiles/customers/:userId (authenticated, limited fields) ────────────
 
 export async function getPublicCustomerProfile(targetId: string) {
