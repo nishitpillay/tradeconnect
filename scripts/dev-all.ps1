@@ -1,17 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$workspaceRoot = if ($env:TRADECONNECT_WORKSPACE_ROOT) {
-  $env:TRADECONNECT_WORKSPACE_ROOT
-} else {
-  Join-Path (Split-Path -Parent $repoRoot) 'tradeconnect'
-}
-
-$backendRoot = Join-Path $workspaceRoot 'backend'
+$backendRoot = Join-Path $repoRoot 'backend'
 
 if (-not (Test-Path $backendRoot)) {
-  throw "Backend repo not found at $backendRoot. Set TRADECONNECT_WORKSPACE_ROOT to your local workspace root."
+  throw "Backend repo not found at $backendRoot."
 }
 
-Write-Host "Starting TradeConnect services from $workspaceRoot ..."
+Write-Host "Starting TradeConnect services from $repoRoot ..."
 & powershell -ExecutionPolicy Bypass -File (Join-Path $backendRoot 'scripts\dev-stack.ps1') -IncludeExpo

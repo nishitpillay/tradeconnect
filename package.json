@@ -3,6 +3,12 @@
   "private": true,
   "scripts": {
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
-    "smoke:all": "powershell -ExecutionPolicy Bypass -File scripts/smoke-all.ps1"
+    "smoke:all": "powershell -ExecutionPolicy Bypass -File scripts/smoke-all.ps1",
+    "shared:build": "npm --prefix packages/shared run build",
+    "backend:build": "npm --prefix backend run build",
+    "backend:test": "npm --prefix backend test -- --runInBand",
+    "web:type-check": "npm --prefix web run type-check",
+    "web:build": "npm --prefix web run build",
+    "mobile:type-check": "npm --prefix mobile run type-check"
   }
 }

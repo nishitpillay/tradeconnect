@@ -50,7 +50,7 @@ Pop-Location
 Start-Sleep -Seconds 4
 
 Start-Process powershell -ArgumentList '-NoProfile', '-Command', 'npm run dev' -WorkingDirectory $backendRoot | Out-Null
-Start-Process powershell -ArgumentList '-NoProfile', '-Command', '$env:PORT=3001; npm run start' -WorkingDirectory $webRoot | Out-Null
+Start-Process powershell -ArgumentList '-NoProfile', '-Command', 'npm run dev -- --port 3001' -WorkingDirectory $webRoot | Out-Null
 
 if ($IncludeExpo) {
   Start-Process powershell -ArgumentList '-NoProfile', '-Command', 'npx expo start --port 8081 --android --clear' -WorkingDirectory $mobileRoot | Out-Null

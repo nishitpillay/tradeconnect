@@ -1,19 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$workspaceRoot = if ($env:TRADECONNECT_WORKSPACE_ROOT) {
-  $env:TRADECONNECT_WORKSPACE_ROOT
-} else {
-  Join-Path (Split-Path -Parent $repoRoot) 'tradeconnect'
-}
-
-$backendRoot = Join-Path $workspaceRoot 'backend'
-$webRoot = Join-Path $workspaceRoot 'web'
-$mobileRoot = Join-Path $workspaceRoot 'mobile'
+$backendRoot = Join-Path $repoRoot 'backend'
+$webRoot = Join-Path $repoRoot 'web'
+$mobileRoot = Join-Path $repoRoot 'mobile'
 
 foreach ($path in @($backendRoot, $webRoot, $mobileRoot)) {
   if (-not (Test-Path $path)) {
-    throw "Expected repo not found at $path. Set TRADECONNECT_WORKSPACE_ROOT to your local workspace root."
+    throw "Expected repo not found at $path."
   }
 }
 
