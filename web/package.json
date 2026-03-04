@@ -1,0 +1,48 @@
+{
+  "name": "tradeconnect-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "E2E_HEADED=true playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:ci": "npm run lint && npm run type-check && npm run test:e2e",
+    "playwright:install": "playwright install chromium",
+    "playwright:report": "playwright show-report",
+    "create:test-accounts": "tsx scripts/create-test-accounts.ts",
+    "test:e2e:setup": "tsx tests/e2e/setup/create-accounts.ts"
+  },
+  "dependencies": {
+    "@tradeconnect/shared": "file:../packages/shared",
+    "@tanstack/react-query": "^5.28.0",
+    "axios": "^1.6.8",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.6.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-intersection-observer": "^9.8.0",
+    "socket.io-client": "^4.7.0",
+    "zod": "^3.22.4",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.18",
+    "dotenv": "^17.3.1",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3"
+  }
+}

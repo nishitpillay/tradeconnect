@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    @apply antialiased;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image: linear-gradient(180deg, #f8fbff 0%, #f4f7fb 45%, #f4f7fb 100%);
+  }
+
+  ::selection {
+    @apply bg-sky-200 text-slate-950;
+  }
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    max-width: 124rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  @screen sm {
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  @screen lg {
+    .container {
+      padding-left: 3rem;
+      padding-right: 3rem;
+    }
+  }
+}
