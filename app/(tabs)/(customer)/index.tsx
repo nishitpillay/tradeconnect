@@ -159,6 +159,23 @@ export default function CustomerHomeScreen() {
                 </Button>
               </View>
 
+              <View style={styles.heroMarketingLinks}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.heroMarketingChip}
+                  onPress={() => router.push('/(auth)/user-experiences')}
+                >
+                  <Text style={styles.heroMarketingChipText}>User Experiences</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.heroMarketingChip}
+                  onPress={() => router.push('/(auth)/pricing')}
+                >
+                  <Text style={styles.heroMarketingChipText}>Pricing</Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.heroStatsRow}>
                 <View style={styles.heroStatCard}>
                   <Text style={styles.heroStatValue}>8</Text>
@@ -461,6 +478,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 20,
+  },
+  heroMarketingLinks: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  heroMarketingChip: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  heroMarketingChipText: {
+    color: '#E0F2FE',
+    fontSize: 12,
+    fontWeight: '700',
   },
   heroStatCard: {
     flex: 1,

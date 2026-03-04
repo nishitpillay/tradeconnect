@@ -46,11 +46,13 @@ function RootLayoutNav() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const authLeaf = segments[1];
+    const isPublicMarketingScreen = authLeaf === 'pricing' || authLeaf === 'user-experiences';
 
     if (!isAuthenticated && !inAuthGroup) {
       // Redirect to welcome if not authenticated
       router.replace('/(auth)/welcome');
-    } else if (isAuthenticated && inAuthGroup) {
+    } else if (isAuthenticated && inAuthGroup && !isPublicMarketingScreen) {
       // Redirect to tabs if authenticated
       router.replace('/(tabs)/(customer)');
     }

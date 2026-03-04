@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../src/components/ui/Button';
 
@@ -11,6 +11,22 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         <Text style={styles.title}>TradeConnect</Text>
         <Text style={styles.subtitle}>Connect with trusted tradies for your next project</Text>
+        <View style={styles.marketingLinks}>
+          <TouchableOpacity
+            style={styles.marketingChip}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(auth)/user-experiences')}
+          >
+            <Text style={styles.marketingChipText}>User Experiences</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.marketingChip}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(auth)/pricing')}
+          >
+            <Text style={styles.marketingChipText}>Pricing</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.actions}>
@@ -55,6 +71,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  marketingLinks: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  marketingChip: {
+    borderRadius: 999,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  marketingChipText: {
+    color: '#1D4ED8',
+    fontSize: 13,
+    fontWeight: '700',
   },
   actions: {
     gap: 12,
