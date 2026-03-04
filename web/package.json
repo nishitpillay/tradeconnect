@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "verify:prod": "node scripts/verify-production.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",

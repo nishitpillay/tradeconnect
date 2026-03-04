@@ -9,6 +9,7 @@
     "backend:test": "npm --prefix backend test -- --runInBand",
     "web:type-check": "npm --prefix web run type-check",
     "web:build": "npm --prefix web run build",
+    "web:verify": "npm --prefix web run verify:prod",
     "mobile:type-check": "npm --prefix mobile run type-check"
   }
 }

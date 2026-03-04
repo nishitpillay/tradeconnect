@@ -17,12 +17,12 @@ if ($LASTEXITCODE -ne 0) {
   throw "Backend/web smoke failed with exit code $LASTEXITCODE"
 }
 
-Write-Host 'Running web type-check...'
+Write-Host 'Running isolated web production verification...'
 Push-Location $webRoot
-npm run type-check
+npm run verify:prod
 if ($LASTEXITCODE -ne 0) {
   Pop-Location
-  throw "Web type-check failed with exit code $LASTEXITCODE"
+  throw "Web production verification failed with exit code $LASTEXITCODE"
 }
 Pop-Location
 

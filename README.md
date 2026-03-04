@@ -59,13 +59,16 @@ This repo is now the TradeConnect monorepo root and tracks the cross-app workspa
 - `npm run dev:all`
   Starts the backend stack, web app, and Expo from this repo.
 - `npm run smoke:all`
-  Runs backend and web smoke checks, web type-check, and the mobile Android smoke test.
+  Runs backend and web smoke checks, isolated web production verification, and the mobile Android smoke test.
 - `npm run shared:build`
 - `npm run backend:build`
 - `npm run backend:test`
 - `npm run web:type-check`
 - `npm run web:build`
+- `npm run web:verify`
 - `npm run mobile:type-check`
+
+`npm run web:verify` uses a dedicated Next build output (`.next-verify`) and port `3002`, so production-style verification does not interfere with the dev server on port `3001`.
 
 ## Current Product Areas
 
