@@ -30,7 +30,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (loading) => set({ isLoading: loading }),
 
   logout: () => {
-    // Clear refresh token cookie via API
     if (typeof window !== 'undefined') {
       document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
@@ -42,8 +41,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initializeAuth: () => {
-    // This will be called on app mount to check for existing session
     set({ isLoading: true });
-    // Auth initialization happens in the API client
   },
 }));

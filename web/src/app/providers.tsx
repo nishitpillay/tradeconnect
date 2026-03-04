@@ -25,28 +25,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Initialize auth on mount
   useEffect(() => {
     async function initializeAuth() {
-      const publicRoutes = new Set(['/', '/login', '/register', '/forgot-password', '/pricing', '/user-experiences']);
-      const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
-
-      // Public pages should not trigger auth bootstrap redirects.
-      if (publicRoutes.has(pathname)) {
-        setLoading(false);
-        return;
-      }
       try {
-        // Try to fetch current user (will use refresh token if access token expired)
-        const user = await authAPI.getMe();
+        const user = await authAPI.getMe({ skipAuthRedirect: true });
         setUser(user);
         setAuthenticated(true);
 
-        // Connect socket if authenticated
         const { accessToken } = useAuthStore.getState();
         if (accessToken) {
           socketClient.connect(accessToken);
         }
       } catch (error) {
-        // Not authenticated or refresh token expired
         setUser(null);
+        setAccessToken(null);
         setAuthenticated(false);
       } finally {
         setLoading(false);
@@ -59,7 +49,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => {
       socketClient.disconnect();
     };
-  }, [setUser, setAuthenticated, setLoading]);
+  }, [setUser, setAccessToken, setAuthenticated, setLoading]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,10 +1,16 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { PublicFooter } from '@/components/marketing/PublicFooter';
 import { PublicNav } from '@/components/marketing/PublicNav';
 import { PRICING_PLANS, PRICING_POLICY_NOTES } from '@/content/marketing';
+import { useAuthStore } from '@/lib/store/authStore';
 
 export default function PricingPage() {
+  const { isAuthenticated } = useAuthStore();
+  const primaryCtaHref = isAuthenticated ? '/dashboard' : '/register';
+
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <div className="absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_36%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.16),_transparent_28%),linear-gradient(180deg,_#f8fbff_0%,_#f4f7fb_58%,_#f4f7fb_100%)]" />
@@ -20,14 +26,14 @@ export default function PricingPage() {
             Pricing designed to stay easy to understand.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600 md:text-xl">
-            A lightweight monthly pricing ladder plus a one-time no lock-in access pass for users who want to try the
-            platform before committing.
+            A lightweight monthly pricing ladder with a clear 36-month minimum commitment, plus a one-time no lock-in
+            access pass for users who want to try the platform first.
           </p>
         </div>
       </section>
 
       <section className="container pb-10">
-        <div className="grid gap-6 xl:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           {PRICING_PLANS.map((plan) => (
             <article
               key={plan.id}
@@ -51,7 +57,7 @@ export default function PricingPage() {
                 </div>
 
                 {plan.highlight ? (
-                  <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white">
+                  <div className="rounded-full border border-sky-400/60 bg-sky-500/25 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100 shadow-sm">
                     Recommended
                   </div>
                 ) : null}
@@ -60,6 +66,24 @@ export default function PricingPage() {
               <p className={`mt-5 text-sm leading-7 ${plan.highlight ? 'text-slate-300' : 'text-slate-600'}`}>
                 {plan.description}
               </p>
+
+              {plan.minimumTerm && plan.minimumTotal ? (
+                <div
+                  className={`mt-6 rounded-[1.25rem] border p-4 ${
+                    plan.highlight ? 'border-white/10 bg-white/5' : 'border-sky-100 bg-sky-50/80'
+                  }`}
+                >
+                  <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${plan.highlight ? 'text-sky-200' : 'text-sky-700'}`}>
+                    Minimum commitment
+                  </div>
+                  <div className={`mt-2 text-sm ${plan.highlight ? 'text-slate-200' : 'text-slate-700'}`}>
+                    {plan.minimumTerm}
+                  </div>
+                  <div className={`mt-1 text-sm font-semibold ${plan.highlight ? 'text-white' : 'text-slate-950'}`}>
+                    {plan.minimumTotal}
+                  </div>
+                </div>
+              ) : null}
 
               <ul className="mt-6 space-y-3">
                 {plan.bullets.map((bullet) => (
@@ -76,10 +100,12 @@ export default function PricingPage() {
               </ul>
 
               <div className="mt-8">
-                <Link href="/register">
+                <Link href={primaryCtaHref}>
                   <Button
                     className={`w-full rounded-full px-6 ${
-                      plan.highlight ? 'bg-white text-slate-950 hover:bg-slate-100' : 'bg-slate-900 hover:bg-slate-800'
+                      plan.highlight
+                        ? 'bg-sky-300 text-slate-950 hover:bg-sky-200'
+                        : 'bg-slate-900 text-white hover:bg-slate-800'
                     }`}
                   >
                     {plan.cta}
@@ -111,14 +137,17 @@ export default function PricingPage() {
             <div className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-200">Why it is structured this way</div>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight">Simple entry, clear upgrade path.</h2>
             <p className="mt-5 text-base leading-8 text-slate-300">
-              The monthly plans keep ongoing access straightforward, while the one-time $20 pass gives first-time users a 30-day evaluation window.
+              The monthly plans stay deliberately simple, but each subscription tier carries a 36-month minimum term so
+              the commitment is visible up front.
             </p>
             <p className="mt-4 text-base leading-8 text-slate-300">
-              To prevent repeat trial cycling, any returning user with the same address and phone number must move to a monthly subscription plan on their next signup cycle.
+              The one-time $20 pass gives first-time users a 30-day evaluation window. To prevent repeat trial cycling,
+              any returning user with the same address and phone number must move to a monthly subscription plan on
+              their next signup cycle.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/register">
-                <Button className="rounded-full bg-white px-6 text-slate-950 hover:bg-slate-100">
+              <Link href={primaryCtaHref}>
+                <Button className="rounded-full bg-sky-300 px-6 text-slate-950 hover:bg-sky-200">
                   Start with TradeConnect
                 </Button>
               </Link>

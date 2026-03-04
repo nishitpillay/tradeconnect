@@ -16,6 +16,8 @@ export function PublicFooter() {
             <Link href="/" className="transition hover:text-slate-900">Home</Link>
             <Link href="/user-experiences" className="transition hover:text-slate-900">User Experiences</Link>
             <Link href="/pricing" className="transition hover:text-slate-900">Pricing</Link>
+            <Link href="/privacy" className="transition hover:text-slate-900">Privacy</Link>
+            <Link href="/terms" className="transition hover:text-slate-900">Terms</Link>
             <Link href="/register" className="transition hover:text-slate-900">Get Started</Link>
           </div>
         </div>

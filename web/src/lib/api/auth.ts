@@ -15,8 +15,8 @@ export const authAPI = {
     return apiClient.post<void>('/auth/logout');
   },
 
-  async getMe(): Promise<User> {
-    return apiClient.get<User>('/auth/me');
+  async getMe(options?: { skipAuthRedirect?: boolean }): Promise<User> {
+    return apiClient.get<User>('/auth/me', options);
   },
 
   async forgotPassword(email: string): Promise<{ message: string }> {

@@ -1,10 +1,16 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { PublicFooter } from '@/components/marketing/PublicFooter';
 import { PublicNav } from '@/components/marketing/PublicNav';
 import { EXPERIENCE_STORIES } from '@/content/marketing';
+import { useAuthStore } from '@/lib/store/authStore';
 
 export default function UserExperiencesPage() {
+  const { isAuthenticated } = useAuthStore();
+  const primaryCtaHref = isAuthenticated ? '/dashboard' : '/register';
+
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <div className="absolute inset-x-0 top-0 -z-10 h-[30rem] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.16),_transparent_26%),linear-gradient(180deg,_#f8fbff_0%,_#f4f7fb_55%,_#f4f7fb_100%)]" />
@@ -14,14 +20,14 @@ export default function UserExperiencesPage() {
       <section className="container py-16 md:py-20">
         <div className="max-w-4xl">
           <div className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-sm">
-            Ten demo customer stories with before and after imagery
+            Ten demo customer stories with real before and after imagery
           </div>
           <h1 className="mt-6 text-5xl font-semibold leading-[0.96] tracking-tight text-slate-950 md:text-7xl">
             User experiences that show how TradeConnect feels in practice.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-600 md:text-xl">
-            These are demo stories designed to show the kind of before-and-after transformations, customer proof, and
-            job outcomes the platform is built to highlight.
+            These pages use real before-and-after imagery to show the kind of transformations, customer proof, and job
+            outcomes the platform is built to highlight.
           </p>
         </div>
       </section>
@@ -71,18 +77,21 @@ export default function UserExperiencesPage() {
                   <p className="mt-4 text-base leading-8 text-slate-600">{story.outcome}</p>
 
                   <blockquote className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
-                    <p className="text-base leading-8 text-slate-700">“{story.quote}”</p>
+                    <p className="text-base leading-8 text-slate-700">&ldquo;{story.quote}&rdquo;</p>
                     <footer className="mt-4 text-sm font-semibold text-slate-950">{story.customer}</footer>
                   </blockquote>
 
                   <div className="mt-8 flex flex-wrap gap-3">
-                    <Link href="/register">
-                      <Button className="rounded-full bg-slate-900 px-6 hover:bg-slate-800">
+                    <Link href={primaryCtaHref}>
+                      <Button className="rounded-full bg-sky-500 px-6 text-white hover:bg-sky-600">
                         Start Similar Project
                       </Button>
                     </Link>
                     <Link href="/pricing">
-                      <Button variant="outline" className="rounded-full border-slate-300 px-6 text-slate-800 hover:bg-slate-50">
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-slate-300 px-6 text-slate-800 hover:bg-slate-50"
+                      >
                         View Pricing
                       </Button>
                     </Link>

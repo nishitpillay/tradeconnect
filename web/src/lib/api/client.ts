@@ -2,6 +2,11 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequ
 import { useAuthStore } from '../store/authStore';
 import { APIError } from '@/types';
 
+type APIRequestConfig = AxiosRequestConfig & {
+  _retry?: boolean;
+  skipAuthRedirect?: boolean;
+};
+
 class APIClient {
   private client: AxiosInstance;
   private refreshTokenPromise: Promise<string> | null = null;
@@ -36,7 +41,7 @@ class APIClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+        const originalRequest = (error.config || {}) as APIRequestConfig;
 
         // If 401 and we haven't retried yet
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -54,9 +59,8 @@ class APIClient {
             // Retry the original request
             return this.client(originalRequest);
           } catch (refreshError) {
-            // Refresh failed, logout user
             useAuthStore.getState().logout();
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && !originalRequest.skipAuthRedirect) {
               window.location.href = '/login';
             }
             return Promise.reject(refreshError);
@@ -119,27 +123,27 @@ class APIClient {
   }
 
   // HTTP Methods
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  async get<T>(url: string, config?: APIRequestConfig): Promise<T> {
     const response = await this.client.get<T>(url, config);
     return response.data;
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  async post<T>(url: string, data?: any, config?: APIRequestConfig): Promise<T> {
     const response = await this.client.post<T>(url, data, config);
     return response.data;
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  async put<T>(url: string, data?: any, config?: APIRequestConfig): Promise<T> {
     const response = await this.client.put<T>(url, data, config);
     return response.data;
   }
 
-  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  async patch<T>(url: string, data?: any, config?: APIRequestConfig): Promise<T> {
     const response = await this.client.patch<T>(url, data, config);
     return response.data;
   }
 
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  async delete<T>(url: string, config?: APIRequestConfig): Promise<T> {
     const response = await this.client.delete<T>(url, config);
     return response.data;
   }

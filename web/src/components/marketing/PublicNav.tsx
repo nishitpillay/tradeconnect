@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { authAPI } from '@/lib/api/auth';
+import { useAuthStore } from '@/lib/store/authStore';
 
 const PUBLIC_LINKS = [
   { href: '/', label: 'Home' },
@@ -12,6 +14,20 @@ const PUBLIC_LINKS = [
 
 export function PublicNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, user, logout } = useAuthStore();
+
+  async function handleLogout() {
+    try {
+      await authAPI.logout();
+    } catch {
+      // Clear client auth state even if the network request fails.
+    } finally {
+      logout();
+      router.push('/');
+      router.refresh();
+    }
+  }
 
   return (
     <nav className="sticky top-0 z-20 border-b border-white/60 bg-white/75 backdrop-blur-xl">
@@ -36,7 +52,7 @@ export function PublicNav() {
                   href={link.href}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     active
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-slate-950 text-white'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
@@ -47,12 +63,32 @@ export function PublicNav() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="ghost" className="rounded-full px-5">Log In</Button>
-            </Link>
-            <Link href="/register">
-              <Button className="rounded-full bg-slate-900 px-5 hover:bg-slate-800">Get Started</Button>
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <div className="hidden rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-600 md:block">
+                  Signed in as {user?.display_name || user?.full_name || 'TradeConnect user'}
+                </div>
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="rounded-full px-5">Dashboard</Button>
+                </Link>
+                <Button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full bg-sky-500 px-5 text-white hover:bg-sky-600"
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" className="rounded-full px-5">Log In</Button>
+                </Link>
+                <Link href="/register">
+                  <Button className="rounded-full bg-sky-500 px-5 text-white hover:bg-sky-600">Get Started</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
