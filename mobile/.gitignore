@@ -16,6 +16,7 @@ web-build/
 .env
 .env.local
 .codex-temp/
+.idea/
 
 # macOS
 .DS_Store
