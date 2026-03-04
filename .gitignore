@@ -15,6 +15,7 @@ npm-debug.*
 web-build/
 .env
 .env.local
+.codex-temp/
 
 # macOS
 .DS_Store

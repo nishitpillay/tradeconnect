@@ -135,7 +135,14 @@ Wait-ForHttpOk -Url 'http://127.0.0.1:8081/status' -TimeoutSeconds 90
 
 Write-Host 'Building and installing Android debug app...'
 cmd /c "set JAVA_HOME=$javaHome&& set PATH=%JAVA_HOME%\bin;%PATH%&& npx expo prebuild --platform android --no-install" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+  throw "expo prebuild failed with exit code $LASTEXITCODE"
+}
+
 cmd /c "set JAVA_HOME=$javaHome&& set PATH=%JAVA_HOME%\bin;%PATH%&& npx expo run:android --variant debug --port 8081" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+  throw "expo run:android failed with exit code $LASTEXITCODE"
+}
 
 adb shell am force-stop com.tradeconnect.app | Out-Null
 adb shell monkey -p com.tradeconnect.app -c android.intent.category.LAUNCHER 1 | Out-Null
