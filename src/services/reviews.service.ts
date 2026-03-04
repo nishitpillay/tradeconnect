@@ -70,7 +70,7 @@ export async function submitReview(
     type:    'review_received',
     channel: 'in_app',
     title:   'You received a new review',
-    body:    `A customer has left you a ${input.rating}-star review.`,
+    body:    `A customer has left you a ${input.rating}/10 review.`,
     data:    { jobId, reviewId: review.id },
   });
 

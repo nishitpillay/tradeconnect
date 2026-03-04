@@ -20,6 +20,7 @@
 import { Pool, PoolClient } from 'pg';
 import { seedCategories }         from './01_categories';
 import { seedAdminAndDemoUsers }  from './02_admin_user';
+import { seedDummyProviders }     from './03_dummy_providers';
 
 // ─── Seed registry ────────────────────────────────────────────────────────────
 
@@ -42,6 +43,12 @@ const SEEDS: SeedDefinition[] = [
     description:     'Superadmin + demo customer + demo provider accounts',
     fn:              seedAdminAndDemoUsers,
     runInProduction: true,    // admin is required in production; demo accounts are skipped by fn
+  },
+  {
+    name:            '03_dummy_providers',
+    description:     'Five dummy provider accounts for each featured category',
+    fn:              seedDummyProviders,
+    runInProduction: false,
   },
 ];
 

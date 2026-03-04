@@ -48,6 +48,7 @@ npx tsx db/migrations/001_extensions_enums.ts
 npx tsx db/migrations/002_user_tables.ts
 npx tsx db/migrations/003_job_quote_tables.ts
 npx tsx db/migrations/004_messaging_moderation.ts
+npx tsx db/migrations/005_expand_rating_scale.ts
 
 # 4. Seed categories and admin user
 npx tsx db/seeds/run.ts

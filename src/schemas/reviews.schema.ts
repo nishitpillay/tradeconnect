@@ -4,11 +4,11 @@ import { z } from 'zod';
 
 export const CreateReviewSchema = z
   .object({
-    rating:               z.number().int().min(1).max(5),
-    rating_quality:       z.number().int().min(1).max(5).optional(),
-    rating_timeliness:    z.number().int().min(1).max(5).optional(),
-    rating_communication: z.number().int().min(1).max(5).optional(),
-    rating_value:         z.number().int().min(1).max(5).optional(),
+    rating:               z.number().int().min(1).max(10),
+    rating_quality:       z.number().int().min(1).max(10).optional(),
+    rating_timeliness:    z.number().int().min(1).max(10).optional(),
+    rating_communication: z.number().int().min(1).max(10).optional(),
+    rating_value:         z.number().int().min(1).max(10).optional(),
     body:                 z.string().trim().min(10).max(2000).optional(),
   })
   .strict();

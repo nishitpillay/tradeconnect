@@ -303,7 +303,7 @@ async function seedDemoProvider(client: PoolClient): Promise<void> {
       // $22 jobs_completed
       2,
       // $23 avg_rating
-      4.80,
+      9.60,
       // $24 total_reviews
       2,
       // $25 response_rate
