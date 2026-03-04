@@ -3,30 +3,52 @@ $ErrorActionPreference = 'Stop'
 function Stop-PortProcess {
   param([int]$Port)
 
-  $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-  if (-not $connections) {
+  $isWindowsHost = $env:OS -eq 'Windows_NT'
+
+  if ($isWindowsHost) {
+    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if (-not $connections) {
+      return
+    }
+
+    $connections |
+      Select-Object -ExpandProperty OwningProcess -Unique |
+      ForEach-Object {
+        try {
+          Stop-Process -Id $_ -Force -ErrorAction Stop
+        } catch {
+          Write-Host ("Skipping PID {0} on port {1}: {2}" -f $_, $Port, $_.Exception.Message)
+        }
+      }
     return
   }
 
-  $connections |
-    Select-Object -ExpandProperty OwningProcess -Unique |
-    ForEach-Object {
+  $lsof = Get-Command lsof -ErrorAction SilentlyContinue
+  if ($lsof) {
+    $pids = & $lsof.Source -ti tcp:$Port 2>$null
+    foreach ($pid in $pids) {
       try {
-        Stop-Process -Id $_ -Force -ErrorAction Stop
+        Stop-Process -Id ([int]$pid) -Force -ErrorAction Stop
       } catch {
-        Write-Host ("Skipping PID {0} on port {1}: {2}" -f $_, $Port, $_.Exception.Message)
+        Write-Host ("Skipping PID {0} on port {1}: {2}" -f $pid, $Port, $_.Exception.Message)
       }
     }
+  }
 }
 
 function Wait-ForHttpOk {
   param(
     [string]$Url,
-    [int]$TimeoutSeconds = 60
+    [int]$TimeoutSeconds = 60,
+    [System.Diagnostics.Process]$WatchProcess
   )
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   while ((Get-Date) -lt $deadline) {
+    if ($WatchProcess -and $WatchProcess.HasExited) {
+      throw "Process exited before $Url became ready."
+    }
+
     try {
       $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
       if ($response.StatusCode -eq 200) {
@@ -107,7 +129,13 @@ function Tap-UiElement {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$javaHome = 'C:\Program Files\Android\Android Studio\jbr'
+$isWindowsHost = $env:OS -eq 'Windows_NT'
+$javaHome = $env:JAVA_HOME
+$gradleJavaHome = if ($javaHome) { $javaHome } else { 'C:\Program Files\Android\Android Studio\jbr' }
+
+if (-not $javaHome) {
+  $javaHome = $gradleJavaHome
+}
 
 if (-not (Test-Path $javaHome)) {
   throw "JAVA_HOME not found at $javaHome"
@@ -126,26 +154,24 @@ adb logcat -c
 $env:JAVA_HOME = $javaHome
 $env:PATH = "$javaHome\bin;$env:PATH"
 
-$metro = Start-Process -FilePath 'powershell' `
-  -ArgumentList '-NoExit', '-Command', 'npm run start:dev-client' `
-  -WorkingDirectory $repoRoot `
-  -PassThru
-
-Wait-ForHttpOk -Url 'http://127.0.0.1:8081/status' -TimeoutSeconds 90
-
 Write-Host 'Building and installing Android debug app...'
 cmd /c "set JAVA_HOME=$javaHome&& set PATH=%JAVA_HOME%\bin;%PATH%&& npx expo prebuild --platform android --no-install" | Out-Host
 if ($LASTEXITCODE -ne 0) {
   throw "expo prebuild failed with exit code $LASTEXITCODE"
 }
 
-cmd /c "set JAVA_HOME=$javaHome&& set PATH=%JAVA_HOME%\bin;%PATH%&& npx expo run:android --variant debug --port 8081" | Out-Host
-if ($LASTEXITCODE -ne 0) {
-  throw "expo run:android failed with exit code $LASTEXITCODE"
+$runLog = Join-Path $repoRoot '.codex-temp\android-smoke-run.log'
+New-Item -ItemType Directory -Path (Split-Path -Parent $runLog) -Force | Out-Null
+if (Test-Path $runLog) {
+  Remove-Item $runLog -Force
 }
 
-adb shell am force-stop com.tradeconnect.app | Out-Null
-adb shell monkey -p com.tradeconnect.app -c android.intent.category.LAUNCHER 1 | Out-Null
+$runProcess = Start-Process -FilePath 'cmd.exe' `
+  -ArgumentList '/c', "set JAVA_HOME=$javaHome&& set PATH=%JAVA_HOME%\bin;%PATH%&& set CI=1&& npx expo run:android --variant debug --port 8081 > ""$runLog"" 2>&1" `
+  -WorkingDirectory $repoRoot `
+  -PassThru
+
+Wait-ForHttpOk -Url 'http://127.0.0.1:8081/status' -TimeoutSeconds 180 -WatchProcess $runProcess
 
 Wait-ForLogMatch -Pattern 'ReactNativeJS: Running "main"|ReactNativeJS: Running "HomeMenu"' -TimeoutSeconds 120
 
@@ -171,4 +197,4 @@ if ($uiDump -notmatch 'TradeConnect|Get Started|Log In') {
 }
 
 Write-Host 'Android smoke test passed.'
-Write-Host "Metro PID: $($metro.Id)"
+Write-Host "Expo run PID: $($runProcess.Id)"

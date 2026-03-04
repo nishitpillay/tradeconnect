@@ -45,7 +45,6 @@ EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3000/api   # Android Emulator
 EXPO_PUBLIC_MOCK_MODE=false  # Real backend
 EXPO_PUBLIC_MOCK_MODE=true   # Mock mode
 EXPO_PUBLIC_ENABLE_SOCKET=true
-EXPO_PUBLIC_ENABLE_NOTIFICATIONS=true
 ```
 
 ### 1.4 Network Conditions to Test

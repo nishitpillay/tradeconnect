@@ -64,7 +64,6 @@ Note: Some React Native features won't work on web (SecureStore, native gestures
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000/api
 EXPO_PUBLIC_MOCK_MODE=true          # ✅ MOCK MODE ENABLED
 EXPO_PUBLIC_ENABLE_SOCKET=false     # Disabled (no backend)
-EXPO_PUBLIC_ENABLE_NOTIFICATIONS=true
 ```
 
 ### Mock Mode Features
@@ -272,4 +271,3 @@ If you encounter issues:
 **Last Updated**: 2026-02-25
 **Metro Bundler**: Running on port 8081
 **Mode**: Mock Mode (no backend required)
-

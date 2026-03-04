@@ -226,7 +226,6 @@ Root (_layout.tsx)
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000/api
 EXPO_PUBLIC_MOCK_MODE=false
 EXPO_PUBLIC_ENABLE_SOCKET=true
-EXPO_PUBLIC_ENABLE_NOTIFICATIONS=true
 ```
 
 ### Platform-Specific URLs
