@@ -44,8 +44,14 @@ export default function DashboardLayout({
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-primary-600">
-                TradeConnect
+              <Link href="/dashboard" className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
+                  TC
+                </div>
+                <div>
+                  <div className="text-lg font-semibold tracking-tight text-slate-950">TradeConnect</div>
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Marketplace for all</div>
+                </div>
               </Link>
               <div className="hidden md:flex space-x-4">
                 <Link

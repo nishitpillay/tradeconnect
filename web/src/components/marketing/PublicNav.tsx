@@ -39,7 +39,7 @@ export function PublicNav() {
             </div>
             <div>
               <div className="text-lg font-semibold tracking-tight text-slate-950">TradeConnect</div>
-              <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Marketplace OS</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Marketplace for all</div>
             </div>
           </Link>
 
