@@ -68,6 +68,9 @@ npm run worker:dev
 npm run build
 npm start
 npm run worker:start
+
+# Queue integration smoke (requires DB + Redis + at least one active user)
+npm run smoke:queue
 ```
 
 The API starts on `http://localhost:3000` (configurable via `PORT` in `.env`).

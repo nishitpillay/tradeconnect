@@ -12,6 +12,7 @@
     "db:seed": "tsx --env-file=.env db/seeds/run.ts",
     "dev:stack": "powershell -ExecutionPolicy Bypass -File scripts/dev-stack.ps1",
     "smoke:stack": "powershell -ExecutionPolicy Bypass -File scripts/smoke-stack.ps1",
+    "smoke:queue": "tsx --env-file=.env src/scripts/queue-smoke.ts",
     "seed:test": "tsx --env-file=.env src/scripts/seed-test-accounts.ts",
     "test": "jest",
     "test:watch": "jest --watch",
