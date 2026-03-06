@@ -31,6 +31,9 @@ const envSchema = z.object({
   API_BASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url().default('http://localhost:3001'),
   CORS_ORIGINS: z.string().min(1).default('http://localhost:3001'),
+  CORS_ORIGINS_DEVELOPMENT: z.string().optional(),
+  CORS_ORIGINS_STAGING: z.string().optional(),
+  CORS_ORIGINS_PRODUCTION: z.string().optional(),
 
   DATABASE_URL: z.string().min(1),
   DB_SSL_ENABLED: envBoolean(),
@@ -68,6 +71,12 @@ const envSchema = z.object({
   RATE_LIMIT_QUOTE_WEEKLY: z.coerce.number().int().default(100),
   RATE_LIMIT_MESSAGE_PER_HOUR: z.coerce.number().int().default(60),
   RATE_LIMIT_LOGIN_PER_15MIN: z.coerce.number().int().default(5),
+  RATE_LIMIT_REGISTER_PER_HOUR: z.coerce.number().int().default(5),
+  RATE_LIMIT_PASSWORD_RESET_PER_HOUR: z.coerce.number().int().default(3),
+  RATE_LIMIT_PHONE_OTP_PER_10MIN: z.coerce.number().int().default(3),
+  RATE_LIMIT_FEED_BROWSE_PER_MIN: z.coerce.number().int().default(120),
+  RATE_LIMIT_CONVERSATION_LIST_PER_MIN: z.coerce.number().int().default(120),
+  RATE_LIMIT_MESSAGE_LIST_PER_MIN: z.coerce.number().int().default(120),
 
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   SENTRY_DSN: optionalUrl,

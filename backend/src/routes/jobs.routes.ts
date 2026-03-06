@@ -5,6 +5,7 @@ import { validate, validateQuery } from '../middleware/validate.middleware';
 import { requireAuth, requireActive } from '../middleware/auth.middleware';
 import { requireRole, requireEmailVerified } from '../middleware/rbac.middleware';
 import {
+  feedBrowsePerMinuteLimit,
   jobPostDailyLimit,
   jobPostWeeklyLimit,
   quoteSubmitDailyLimit,
@@ -87,6 +88,7 @@ router.post(
 router.get(
   '/feed',
   requireRole('provider'),
+  feedBrowsePerMinuteLimit,
   validateQuery(JobFeedQuerySchema),
   jobsCtrl.list
 );

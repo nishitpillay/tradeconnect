@@ -129,6 +129,47 @@ Security and reliability guardrails:
   - emits lightweight `messaging.message.created` / `messaging.message.deleted`
   - clients fetch full message bodies over REST
 
+## Security Baseline
+
+TradeConnect backend now enforces a production-oriented baseline for transport and API protections:
+
+- Tight Helmet profile (`src/config/security.ts`)
+  - strict CSP for API surface
+  - `frameguard: deny`, `referrerPolicy: no-referrer`, `noSniff`, `hidePoweredBy`
+  - production HSTS (`max-age=31536000; includeSubDomains; preload`)
+- CORS allowlist per environment
+  - default: `CORS_ORIGINS`
+  - optional overrides:
+    - `CORS_ORIGINS_DEVELOPMENT`
+    - `CORS_ORIGINS_STAGING`
+    - `CORS_ORIGINS_PRODUCTION`
+- Explicit preflight policy
+  - allowed methods: `GET,POST,PATCH,PUT,DELETE,OPTIONS`
+  - credentials enabled
+  - `maxAge=600`
+
+### Rate-limit Policy Matrix
+
+Policy source: `src/middleware/rateLimit.middleware.ts` (`rateLimitPolicyMatrix`)
+
+| Route | Bucket | Limit | Window | Purpose |
+| --- | --- | --- | --- | --- |
+| `POST /api/v1/auth/login` | IP | `RATE_LIMIT_LOGIN_PER_15MIN` | 15m | brute-force protection |
+| `POST /api/v1/auth/register` | IP | `RATE_LIMIT_REGISTER_PER_HOUR` | 1h | signup abuse prevention |
+| `POST /api/v1/auth/forgot-password` | IP | `RATE_LIMIT_PASSWORD_RESET_PER_HOUR` | 1h | reset abuse protection |
+| `POST /api/v1/auth/phone/request-otp` | User | `RATE_LIMIT_PHONE_OTP_PER_10MIN` | 10m | OTP abuse protection |
+| `GET /api/v1/jobs/feed` | User | `RATE_LIMIT_FEED_BROWSE_PER_MIN` | 1m | scrape/polling protection |
+| `GET /api/v1/conversations` | User | `RATE_LIMIT_CONVERSATION_LIST_PER_MIN` | 1m | list polling control |
+| `GET /api/v1/conversations/:id/messages` | User | `RATE_LIMIT_MESSAGE_LIST_PER_MIN` | 1m | chat polling control |
+| `POST /api/v1/jobs` | User | `RATE_LIMIT_JOB_POST_DAILY` and `RATE_LIMIT_JOB_POST_WEEKLY` | 1d + 7d | job spam control |
+| `POST /api/v1/jobs/:id/quotes` | User | `RATE_LIMIT_QUOTE_DAILY` and `RATE_LIMIT_QUOTE_WEEKLY` | 1d + 7d | quote spam control |
+| `POST /api/v1/conversations/:id/messages` | User | `RATE_LIMIT_MESSAGE_PER_HOUR` | 1h | chat flood control |
+
+Security-focused tests added:
+
+- `src/config/__tests__/security.config.test.ts`
+- `src/middleware/__tests__/rateLimit.policy.test.ts`
+
 ## Project Structure
 
 ```text
@@ -170,6 +211,9 @@ db/
 - `REFRESH_TOKEN_EXPIRY` (refresh token TTL, default `30d`)
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
+- `CORS_ORIGINS_DEVELOPMENT`
+- `CORS_ORIGINS_STAGING`
+- `CORS_ORIGINS_PRODUCTION`
 - `REDIS_URL`
 - `SOCKET_IO_REDIS_ADAPTER_ENABLED`
 - `SOCKET_IO_MAX_HTTP_BUFFER_BYTES`
@@ -184,6 +228,13 @@ db/
 - `SENTRY_DSN`
 - `OTEL_ENABLED`
 - `OTEL_EXPORTER_OTLP_ENDPOINT`
+- `RATE_LIMIT_LOGIN_PER_15MIN`
+- `RATE_LIMIT_REGISTER_PER_HOUR`
+- `RATE_LIMIT_PASSWORD_RESET_PER_HOUR`
+- `RATE_LIMIT_PHONE_OTP_PER_10MIN`
+- `RATE_LIMIT_FEED_BROWSE_PER_MIN`
+- `RATE_LIMIT_CONVERSATION_LIST_PER_MIN`
+- `RATE_LIMIT_MESSAGE_LIST_PER_MIN`
 
 ## Environment Profiles
 

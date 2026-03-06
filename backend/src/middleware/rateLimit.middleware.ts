@@ -1,22 +1,7 @@
-/**
- * Rate Limiting Middleware
- *
- * Two-layer approach:
- *   1. Redis-based IP rate limiting (pre-auth, fast)     — for login/register
- *   2. DB-based per-user action counting (authenticated) — for jobs/quotes/messages
- *
- * DB layer uses the rate_limit_events table (sliding window via upsert).
- * Window size is calculated by truncating NOW() to the window duration.
- *
- * On limit exceeded: 429 with Retry-After header.
- */
-
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../config/database';
 import { redisRateLimit } from '../config/redis';
 import { env } from '../config/env';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ActionKey =
   | 'post_job'
@@ -24,21 +9,140 @@ type ActionKey =
   | 'submit_quote'
   | 'submit_quote_weekly'
   | 'send_message'
-  | 'send_message_global'
-  | 'login_attempt'
-  | 'register'
-  | 'password_reset'
-  | 'phone_otp'
-  | 'submit_report'
-  | 'upload_file';
+  | 'list_messages'
+  | 'list_conversations'
+  | 'browse_feed'
+  | 'phone_otp';
 
-interface RateLimitConfig {
+interface DbRateLimitConfig {
   actionKey: ActionKey;
-  max:       number;
-  windowMs:  number;  // milliseconds
+  max: number;
+  windowMs: number;
 }
 
-// ─── DB-based rate limiter (authenticated users) ──────────────────────────────
+interface PolicyItem {
+  route: string;
+  bucket: 'ip' | 'user';
+  actionKey: string;
+  limit: number;
+  windowSeconds: number;
+  purpose: string;
+}
+
+const ONE_MINUTE_MS = 60 * 1000;
+const ONE_HOUR_MS = 60 * ONE_MINUTE_MS;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+const ONE_WEEK_MS = 7 * ONE_DAY_MS;
+
+export const rateLimitPolicyMatrix: PolicyItem[] = [
+  {
+    route: 'POST /api/v1/auth/login',
+    bucket: 'ip',
+    actionKey: 'login',
+    limit: env.RATE_LIMIT_LOGIN_PER_15MIN,
+    windowSeconds: 15 * 60,
+    purpose: 'Brute-force login protection',
+  },
+  {
+    route: 'POST /api/v1/auth/register',
+    bucket: 'ip',
+    actionKey: 'register',
+    limit: env.RATE_LIMIT_REGISTER_PER_HOUR,
+    windowSeconds: 60 * 60,
+    purpose: 'Abuse prevention for account creation',
+  },
+  {
+    route: 'POST /api/v1/auth/forgot-password',
+    bucket: 'ip',
+    actionKey: 'password_reset',
+    limit: env.RATE_LIMIT_PASSWORD_RESET_PER_HOUR,
+    windowSeconds: 60 * 60,
+    purpose: 'Password-reset abuse protection',
+  },
+  {
+    route: 'POST /api/v1/auth/phone/request-otp',
+    bucket: 'user',
+    actionKey: 'phone_otp',
+    limit: env.RATE_LIMIT_PHONE_OTP_PER_10MIN,
+    windowSeconds: 10 * 60,
+    purpose: 'OTP abuse protection',
+  },
+  {
+    route: 'GET /api/v1/jobs/feed',
+    bucket: 'user',
+    actionKey: 'browse_feed',
+    limit: env.RATE_LIMIT_FEED_BROWSE_PER_MIN,
+    windowSeconds: 60,
+    purpose: 'Protect feed browsing from scraping bursts',
+  },
+  {
+    route: 'GET /api/v1/conversations',
+    bucket: 'user',
+    actionKey: 'list_conversations',
+    limit: env.RATE_LIMIT_CONVERSATION_LIST_PER_MIN,
+    windowSeconds: 60,
+    purpose: 'Protect conversation index from polling abuse',
+  },
+  {
+    route: 'GET /api/v1/conversations/:id/messages',
+    bucket: 'user',
+    actionKey: 'list_messages',
+    limit: env.RATE_LIMIT_MESSAGE_LIST_PER_MIN,
+    windowSeconds: 60,
+    purpose: 'Protect message reads from high-frequency polling',
+  },
+  {
+    route: 'POST /api/v1/jobs',
+    bucket: 'user',
+    actionKey: 'post_job',
+    limit: env.RATE_LIMIT_JOB_POST_DAILY,
+    windowSeconds: 24 * 60 * 60,
+    purpose: 'Limit job posting churn',
+  },
+  {
+    route: 'POST /api/v1/jobs',
+    bucket: 'user',
+    actionKey: 'post_job_weekly',
+    limit: env.RATE_LIMIT_JOB_POST_WEEKLY,
+    windowSeconds: 7 * 24 * 60 * 60,
+    purpose: 'Limit weekly posting volume',
+  },
+  {
+    route: 'POST /api/v1/jobs/:id/quotes',
+    bucket: 'user',
+    actionKey: 'submit_quote',
+    limit: env.RATE_LIMIT_QUOTE_DAILY,
+    windowSeconds: 24 * 60 * 60,
+    purpose: 'Limit provider quote spam',
+  },
+  {
+    route: 'POST /api/v1/jobs/:id/quotes',
+    bucket: 'user',
+    actionKey: 'submit_quote_weekly',
+    limit: env.RATE_LIMIT_QUOTE_WEEKLY,
+    windowSeconds: 7 * 24 * 60 * 60,
+    purpose: 'Limit weekly quote volume',
+  },
+  {
+    route: 'POST /api/v1/conversations/:id/messages',
+    bucket: 'user',
+    actionKey: 'send_message',
+    limit: env.RATE_LIMIT_MESSAGE_PER_HOUR,
+    windowSeconds: 60 * 60,
+    purpose: 'Limit chat flood behavior',
+  },
+];
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0].split(',')[0].trim();
+  }
+  if (typeof forwarded === 'string' && forwarded.trim() !== '') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress ?? 'unknown';
+}
 
 async function checkDbRateLimit(
   userId: string,
@@ -61,8 +165,7 @@ async function checkDbRateLimit(
   return { allowed: count <= max, count, windowStart };
 }
 
-/** Factory: create an Express middleware for a specific authenticated action. */
-export function dbRateLimit(config: RateLimitConfig) {
+export function dbRateLimit(config: DbRateLimitConfig) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
       next();
@@ -80,13 +183,11 @@ export function dbRateLimit(config: RateLimitConfig) {
       if (!allowed) {
         const windowEndMs = windowStart.getTime() + config.windowMs;
         const retryAfterSeconds = Math.ceil((windowEndMs - Date.now()) / 1000);
-
         res.set('Retry-After', String(retryAfterSeconds));
         res.status(429).json({
           error: {
-            code:    'RATE_LIMIT_EXCEEDED',
-            message: `Too many ${config.actionKey.replace(/_/g, ' ')} requests. ` +
-                     `Please wait ${retryAfterSeconds} seconds.`,
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: `Too many requests for ${config.actionKey.replace(/_/g, ' ')}.`,
             details: { retry_after_seconds: retryAfterSeconds },
           },
         });
@@ -94,28 +195,17 @@ export function dbRateLimit(config: RateLimitConfig) {
       }
 
       next();
-    } catch (err) {
-      // If rate limit check fails (DB down), allow the request through
-      // (fail open) — don't block users due to infrastructure issues.
-      console.error('[RateLimit] DB check failed, allowing request:', err);
+    } catch (error) {
+      // Fail-open on infrastructure issues to avoid broad outages.
+      console.error('[RateLimit] DB limiter check failed, allowing request:', error);
       next();
     }
   };
 }
 
-// ─── Redis-based IP rate limiter (for auth endpoints) ─────────────────────────
-
-/** IP-level rate limiter using Redis. Used for login, register, OTP. */
-export function ipRateLimit(
-  actionKey: string,
-  maxRequests: number,
-  windowSeconds: number
-) {
+export function ipRateLimit(actionKey: string, maxRequests: number, windowSeconds: number) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-      ?? req.socket.remoteAddress
-      ?? 'unknown';
-
+    const ip = getClientIp(req);
     try {
       const { allowed, remaining, resetAt } = await redisRateLimit(
         `ip:${ip}:${actionKey}`,
@@ -124,9 +214,9 @@ export function ipRateLimit(
       );
 
       res.set({
-        'X-RateLimit-Limit':     String(maxRequests),
+        'X-RateLimit-Limit': String(maxRequests),
         'X-RateLimit-Remaining': String(remaining),
-        'X-RateLimit-Reset':     String(Math.ceil(resetAt.getTime() / 1000)),
+        'X-RateLimit-Reset': String(Math.ceil(resetAt.getTime() / 1000)),
       });
 
       if (!allowed) {
@@ -134,8 +224,8 @@ export function ipRateLimit(
         res.set('Retry-After', String(retryAfter));
         res.status(429).json({
           error: {
-            code:    'RATE_LIMIT_EXCEEDED',
-            message: `Too many requests. Please wait ${retryAfter} seconds.`,
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Too many requests.',
             details: { retry_after_seconds: retryAfter },
           },
         });
@@ -144,71 +234,71 @@ export function ipRateLimit(
 
       next();
     } catch {
-      // Redis down: fail open
+      // Fail-open when Redis is unavailable.
       next();
     }
   };
 }
 
-// ─── Pre-configured limiters ──────────────────────────────────────────────────
-
-const ONE_DAY_MS  = 24 * 60 * 60 * 1000;
-const ONE_WEEK_MS = 7 * ONE_DAY_MS;
-const ONE_HOUR_MS = 60 * 60 * 1000;
-
-/** POST /jobs — customer posting jobs */
-export const jobPostDailyLimit  = dbRateLimit({
+export const jobPostDailyLimit = dbRateLimit({
   actionKey: 'post_job',
-  max:       env.RATE_LIMIT_JOB_POST_DAILY,
-  windowMs:  ONE_DAY_MS,
+  max: env.RATE_LIMIT_JOB_POST_DAILY,
+  windowMs: ONE_DAY_MS,
 });
 
 export const jobPostWeeklyLimit = dbRateLimit({
   actionKey: 'post_job_weekly',
-  max:       env.RATE_LIMIT_JOB_POST_WEEKLY,
-  windowMs:  ONE_WEEK_MS,
+  max: env.RATE_LIMIT_JOB_POST_WEEKLY,
+  windowMs: ONE_WEEK_MS,
 });
 
-/** POST /jobs/:id/quotes — provider submitting quotes */
-export const quoteSubmitDailyLimit  = dbRateLimit({
+export const quoteSubmitDailyLimit = dbRateLimit({
   actionKey: 'submit_quote',
-  max:       env.RATE_LIMIT_QUOTE_DAILY,
-  windowMs:  ONE_DAY_MS,
+  max: env.RATE_LIMIT_QUOTE_DAILY,
+  windowMs: ONE_DAY_MS,
 });
 
 export const quoteSubmitWeeklyLimit = dbRateLimit({
   actionKey: 'submit_quote_weekly',
-  max:       env.RATE_LIMIT_QUOTE_WEEKLY,
-  windowMs:  ONE_WEEK_MS,
+  max: env.RATE_LIMIT_QUOTE_WEEKLY,
+  windowMs: ONE_WEEK_MS,
 });
 
-/** POST /conversations/:id/messages — per-conversation hourly limit */
 export const messageHourlyLimit = dbRateLimit({
   actionKey: 'send_message',
-  max:       env.RATE_LIMIT_MESSAGE_PER_HOUR,
-  windowMs:  ONE_HOUR_MS,
+  max: env.RATE_LIMIT_MESSAGE_PER_HOUR,
+  windowMs: ONE_HOUR_MS,
 });
 
-/** POST /auth/login — IP-based */
-export const loginIpLimit = ipRateLimit(
-  'login',
-  env.RATE_LIMIT_LOGIN_PER_15MIN,
-  15 * 60   // 15 minutes
+export const feedBrowsePerMinuteLimit = dbRateLimit({
+  actionKey: 'browse_feed',
+  max: env.RATE_LIMIT_FEED_BROWSE_PER_MIN,
+  windowMs: ONE_MINUTE_MS,
+});
+
+export const conversationListPerMinuteLimit = dbRateLimit({
+  actionKey: 'list_conversations',
+  max: env.RATE_LIMIT_CONVERSATION_LIST_PER_MIN,
+  windowMs: ONE_MINUTE_MS,
+});
+
+export const messageListPerMinuteLimit = dbRateLimit({
+  actionKey: 'list_messages',
+  max: env.RATE_LIMIT_MESSAGE_LIST_PER_MIN,
+  windowMs: ONE_MINUTE_MS,
+});
+
+export const loginIpLimit = ipRateLimit('login', env.RATE_LIMIT_LOGIN_PER_15MIN, 15 * 60);
+export const registerIpLimit = ipRateLimit('register', env.RATE_LIMIT_REGISTER_PER_HOUR, 60 * 60);
+
+export const passwordResetLimit = ipRateLimit(
+  'password_reset',
+  env.RATE_LIMIT_PASSWORD_RESET_PER_HOUR,
+  60 * 60
 );
 
-/** POST /auth/register — IP-based */
-export const registerIpLimit = ipRateLimit('register', 5, 60 * 60);
-
-/** POST /auth/forgot-password — email-scoped */
-export const passwordResetLimit = dbRateLimit({
-  actionKey: 'password_reset',
-  max:       3,
-  windowMs:  ONE_HOUR_MS,
-});
-
-/** POST /auth/request-phone-otp — phone-scoped (handled in service) */
 export const phoneOtpLimit = dbRateLimit({
   actionKey: 'phone_otp',
-  max:       3,
-  windowMs:  10 * 60 * 1000,   // 10 minutes
+  max: env.RATE_LIMIT_PHONE_OTP_PER_10MIN,
+  windowMs: 10 * ONE_MINUTE_MS,
 });

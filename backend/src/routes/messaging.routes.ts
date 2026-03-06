@@ -3,7 +3,11 @@ import * as messagingCtrl from '../controllers/messaging.controller';
 import { validate, validateQuery } from '../middleware/validate.middleware';
 import { requireAuth, requireActive } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
-import { messageHourlyLimit } from '../middleware/rateLimit.middleware';
+import {
+  conversationListPerMinuteLimit,
+  messageHourlyLimit,
+  messageListPerMinuteLimit,
+} from '../middleware/rateLimit.middleware';
 import {
   CreateConversationSchema,
   OpenAdminSupportConversationSchema,
@@ -18,7 +22,7 @@ router.use(requireAuth, requireActive);
 
 // ── Conversations ─────────────────────────────────────────────────────────────
 
-router.get('/', messagingCtrl.listConversations);
+router.get('/', conversationListPerMinuteLimit, messagingCtrl.listConversations);
 
 router.post(
   '/',
@@ -40,6 +44,7 @@ router.get('/:id', messagingCtrl.getConversation);
 
 router.get(
   '/:id/messages',
+  messageListPerMinuteLimit,
   validateQuery(ListMessagesQuerySchema),
   messagingCtrl.listMessages
 );

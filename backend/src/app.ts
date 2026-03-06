@@ -3,8 +3,6 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import express, { Request, Response } from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
@@ -33,40 +31,18 @@ import { verifyAccessToken, isUserTokensInvalidated } from './services/jwt.servi
 import * as userRepo from './repositories/user.repo';
 import * as messagingRepo from './repositories/messaging.repo';
 import { conversationRoom, LEGACY_SOCKET_EVENTS, SOCKET_EVENTS, userRoom } from './realtime/socket.events';
+import { resolveCorsAllowedOrigins, securityMiddlewares } from './config/security';
 
 initSentry('tradeconnect-backend-api');
 
 const app = express();
 const API_VERSION = 'v1';
+const allowedOrigins = resolveCorsAllowedOrigins(env);
+const security = securityMiddlewares(env.NODE_ENV, allowedOrigins);
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
-
-const allowedOrigins = env.CORS_ORIGINS
-  .split(',')
-  .map((o) => o.trim());
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Request-Id',
-    'X-Correlation-Id',
-    'X-CSRF-Token',
-    'X-Device-Id',
-  ],
-  exposedHeaders: ['X-Request-Id', 'X-Correlation-Id', 'Retry-After'],
-}));
+app.disable('x-powered-by');
+app.use(security.helmet);
+app.use(security.cors);
 
 app.use(requestContextMiddleware);
 app.use(httpLoggerMiddleware);
