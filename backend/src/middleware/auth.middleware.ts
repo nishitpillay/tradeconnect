@@ -1,48 +1,7 @@
-/**
- * Authentication Middleware
- *
- * Extracts and verifies the JWT access token from the Authorization header.
- * Attaches the decoded user payload to req.user.
- *
- * Uses:
- *   requireAuth  — any valid token; user may be in any status
- *   requireActive — valid token + user status must be 'active'
- *
- * Token format:  Authorization: Bearer <access_token>
- *
- * Does NOT query the database on every request (stateless JWT).
- * User status checks (banned/suspended) happen in requireActive, which
- * reads from a lightweight Redis cache refreshed on status change.
- */
-
 import { Request, Response, NextFunction } from 'express';
-import { jwtService, JWTPayload } from '../services/jwt.service';
+import { jwtService } from '../services/jwt.service';
 import { Errors } from './errors';
 import { redis } from '../config/redis';
-
-// ─── Type augmentation ────────────────────────────────────────────────────────
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-      requestId?: string;
-    }
-  }
-}
-
-// ─── Request ID middleware (attach first in app.ts) ───────────────────────────
-
-export function requestIdMiddleware(
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): void {
-  req.requestId = (req.headers['x-request-id'] as string) ?? crypto.randomUUID();
-  next();
-}
-
-// ─── Core JWT verification ─────────────────────────────────────────────────────
 
 function extractToken(req: Request): string | null {
   const header = req.headers.authorization;
@@ -52,7 +11,6 @@ function extractToken(req: Request): string | null {
   return parts[1];
 }
 
-/** Attach user to req if valid token; passes through if no token. */
 export async function optionalAuth(
   req: Request,
   _res: Response,
@@ -64,12 +22,11 @@ export async function optionalAuth(
   try {
     req.user = jwtService.verifyAccessToken(token);
   } catch {
-    // silently ignore for optional auth
+    // ignore for optional auth
   }
   next();
 }
 
-/** Require a valid access token. Returns 401 if missing/invalid/expired. */
 export function requireAuth(
   req: Request,
   res: Response,
@@ -96,8 +53,6 @@ export function requireAuth(
   }
 }
 
-/** Require valid token + user must be active (not banned/suspended).
- *  Checks a Redis key set on account status change — avoids DB round-trip. */
 export async function requireActive(
   req: Request,
   res: Response,
@@ -111,7 +66,7 @@ export async function requireActive(
     return;
   }
 
-  let payload: JWTPayload;
+  let payload;
   try {
     payload = jwtService.verifyAccessToken(token);
   } catch (err) {
@@ -124,8 +79,6 @@ export async function requireActive(
     return;
   }
 
-  // Check Redis for account status override (set when admin suspends/bans)
-  // Key format: "user-status:<userId>"  Value: "suspended" | "banned"
   try {
     const statusOverride = await redis.get(`user-status:${payload.userId}`);
     if (statusOverride === 'banned') {
@@ -139,7 +92,7 @@ export async function requireActive(
       return;
     }
   } catch {
-    // Redis failure: fall through (don't block the request)
+    // Redis failures should not block auth.
   }
 
   req.user = payload;

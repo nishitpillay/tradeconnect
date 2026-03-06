@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/rbac.middleware';
 import { messageHourlyLimit } from '../middleware/rateLimit.middleware';
 import {
   CreateConversationSchema,
+  OpenAdminSupportConversationSchema,
   SendMessageSchema,
   ListMessagesQuerySchema,
 } from '../schemas/messaging.schema';
@@ -24,6 +25,13 @@ router.post(
   requireRole('provider'),
   validate(CreateConversationSchema),
   messagingCtrl.openConversation
+);
+
+router.post(
+  '/admin-support',
+  requireRole('customer', 'provider'),
+  validate(OpenAdminSupportConversationSchema),
+  messagingCtrl.openAdminSupportConversation
 );
 
 router.get('/:id', messagingCtrl.getConversation);

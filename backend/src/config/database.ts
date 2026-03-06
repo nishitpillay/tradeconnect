@@ -1,61 +1,25 @@
-/**
- * Database Configuration
- *
- * Single pg.Pool instance shared across the entire application.
- * All queries should go through this pool — never create ad-hoc connections.
- *
- * Features:
- *   - Environment-validated config (throws at startup if misconfigured)
- *   - Connection-level app.secret_key SET for pgcrypto address encryption
- *   - Structured logging of slow queries (> SLOW_QUERY_THRESHOLD_MS)
- *   - Health-check helper: db.healthCheck()
- *   - Graceful shutdown: db.end()
- */
-
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { env } from './env';
+import { contextualLogger } from '../observability/logger';
 
-// ─── Config validation ────────────────────────────────────────────────────────
-
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  throw new Error('[DB] DATABASE_URL environment variable is required.');
-}
-
-const APP_SECRET_KEY = process.env.DB_ENCRYPTION_KEY;
-if (!APP_SECRET_KEY || APP_SECRET_KEY.length < 32) {
-  throw new Error(
-    '[DB] DB_ENCRYPTION_KEY must be set and >= 32 characters ' +
-    '(used for pgcrypto symmetric encryption of exact addresses).'
-  );
-}
-
-const SLOW_QUERY_THRESHOLD_MS = parseInt(process.env.SLOW_QUERY_MS ?? '300', 10);
-
-// ─── Pool configuration ───────────────────────────────────────────────────────
+const log = contextualLogger({ component: 'database' });
 
 const pool = new Pool({
-  connectionString: DATABASE_URL,
-  max:              parseInt(process.env.DB_POOL_MAX ?? '10', 10),
+  connectionString: env.DATABASE_URL,
+  max: env.DB_POOL_MAX,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  // SSL in production; skip for local dev
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: true }
-    : false,
+  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
 });
 
-// Set app-level GUC on every new connection (used by pgcrypto functions)
 pool.on('connect', async (client: PoolClient) => {
-  // Escape the key to prevent injection through the GUC
-  const escaped = APP_SECRET_KEY.replace(/'/g, "''");
+  const escaped = env.DB_ENCRYPTION_KEY.replace(/'/g, "''");
   await client.query(`SET app.secret_key = '${escaped}';`);
 });
 
 pool.on('error', (err) => {
-  console.error('[DB] Unexpected pool error:', err.message);
+  log.error({ err }, 'Unexpected PostgreSQL pool error');
 });
-
-// ─── Query wrapper with logging ───────────────────────────────────────────────
 
 type QueryParams = (string | number | boolean | null | Date | Buffer | string[] | number[])[];
 
@@ -69,29 +33,33 @@ async function query<T extends QueryResultRow = QueryResultRow>(
     const result = await pool.query<T>(text, params);
     const duration = Date.now() - start;
 
-    if (duration > SLOW_QUERY_THRESHOLD_MS) {
-      console.warn('[DB] Slow query detected', {
-        duration_ms: duration,
-        threshold_ms: SLOW_QUERY_THRESHOLD_MS,
-        // Truncate query for log safety (never log param values — may contain PII)
-        query: text.slice(0, 200),
-        rows: result.rowCount,
-      });
+    if (duration > env.SLOW_QUERY_MS) {
+      log.warn(
+        {
+          durationMs: duration,
+          thresholdMs: env.SLOW_QUERY_MS,
+          query: text.slice(0, 200),
+          rows: result.rowCount,
+        },
+        'Slow database query'
+      );
     }
 
     return result;
-  } catch (err) {
-    const pgError = err as { code?: string; detail?: string; table?: string };
-    console.error('[DB] Query error', {
-      code:   pgError.code,
-      table:  pgError.table,
-      query:  text.slice(0, 200),  // truncated; never log params
-    });
-    throw err;
+  } catch (error) {
+    const pgError = error as { code?: string; table?: string };
+    log.error(
+      {
+        err: error,
+        code: pgError.code,
+        table: pgError.table,
+        query: text.slice(0, 200),
+      },
+      'Database query failed'
+    );
+    throw error;
   }
 }
-
-// ─── Transaction helper ───────────────────────────────────────────────────────
 
 async function withTransaction<T>(
   fn: (client: PoolClient) => Promise<T>
@@ -102,15 +70,13 @@ async function withTransaction<T>(
     const result = await fn(client);
     await client.query('COMMIT');
     return result;
-  } catch (err) {
+  } catch (error) {
     await client.query('ROLLBACK');
-    throw err;
+    throw error;
   } finally {
     client.release();
   }
 }
-
-// ─── Health check ─────────────────────────────────────────────────────────────
 
 async function healthCheck(): Promise<{ ok: boolean; latency_ms: number }> {
   const start = Date.now();
@@ -122,29 +88,17 @@ async function healthCheck(): Promise<{ ok: boolean; latency_ms: number }> {
   }
 }
 
-// ─── Graceful shutdown ────────────────────────────────────────────────────────
-
 async function end(): Promise<void> {
   await pool.end();
-  console.log('[DB] Pool closed.');
+  log.info('PostgreSQL pool closed');
 }
-
-// ─── Exports ──────────────────────────────────────────────────────────────────
 
 export const db = {
   query,
   withTransaction,
   healthCheck,
   end,
-  /**
-   * Get a raw client for operations that need manual transaction control.
-   * Always release the client in a finally block.
-   * @example
-   *   const client = await db.getClient();
-   *   try { ... } finally { client.release(); }
-   */
   getClient: () => pool.connect(),
-  /** Encrypt a plain-text value using pgcrypto + app.secret_key GUC */
   encryptValue: async (plainText: string): Promise<Buffer> => {
     const result = await pool.query<{ enc: Buffer }>(
       `SELECT pgp_sym_encrypt($1, current_setting('app.secret_key')) AS enc`,
@@ -152,7 +106,6 @@ export const db = {
     );
     return result.rows[0].enc;
   },
-  /** Decrypt a pgcrypto-encrypted bytea column value */
   decryptValue: async (encryptedBytes: Buffer): Promise<string> => {
     const result = await pool.query<{ val: string }>(
       `SELECT pgp_sym_decrypt($1, current_setting('app.secret_key')) AS val`,

@@ -62,21 +62,37 @@ npm run seed:test
 ```bash
 # Development (watch mode)
 npm run dev
+npm run worker:dev
 
 # Production build
 npm run build
 npm start
+npm run worker:start
 ```
 
 The API starts on `http://localhost:3000` (configurable via `PORT` in `.env`).
 
-## Health Check
+## Health and Readiness
 
 ```
+GET /healthz
+GET /readyz
 GET /health
 ```
 
-Returns `{"status":"ok","db":true,"redis":true,...}` when all services are connected.
+- `/healthz` is liveness only.
+- `/readyz` validates PostgreSQL + Redis and checks pending migrations if `pgmigrations` metadata is available.
+- `/health` is kept as a compatibility endpoint.
+
+## Observability
+
+- Structured JSON logs with `pino` (`requestId` and `correlationId` on all request logs).
+- Request context middleware propagates:
+  - `X-Request-Id`
+  - `X-Correlation-Id`
+- OpenTelemetry auto-instrumentation is enabled for Express/HTTP, PostgreSQL, and Redis.
+- BullMQ traces are added around notification enqueue and worker job processing.
+- Sentry captures backend + worker exceptions and performance traces.
 
 ## API Overview
 
@@ -135,3 +151,9 @@ Key variables:
 | `REDIS_URL` | Redis connection string |
 | `JWT_SECRET` | Secret for signing JWTs (min 64 chars) |
 | `DB_ENCRYPTION_KEY` | Key for encrypting job addresses (min 32 chars) |
+| `SENTRY_DSN` | Sentry DSN (optional) |
+| `SENTRY_TRACES_SAMPLE_RATE` | Sentry tracing sample rate (0-1) |
+| `OTEL_ENABLED` | Enable OpenTelemetry |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint (e.g. `http://localhost:4318`) |
+| `WORKER_CONCURRENCY` | BullMQ worker concurrency |
+| `NOTIFICATIONS_USE_QUEUE` | Queue notification delivery through BullMQ worker |

@@ -16,6 +16,8 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { db } from '../config/database';
 import { env } from '../config/env';
 import { getMessaging } from '../config/firebase';
+import { enqueueNotification } from '../queues/notifications.queue';
+import { contextualLogger } from '../observability/logger';
 
 // ── SES client ────────────────────────────────────────────────────────────────
 
@@ -46,8 +48,28 @@ export interface NotifyOptions {
 
 /** Fire-and-forget notification. Persists to DB and dispatches to channel. */
 export function notify(opts: NotifyOptions): void {
+  if (env.NOTIFICATIONS_USE_QUEUE) {
+    enqueueNotification({
+      userId: opts.userId,
+      type: opts.type,
+      channel: opts.channel,
+      title: opts.title,
+      body: opts.body,
+      data: opts.data,
+    }).catch((err: Error) => {
+      contextualLogger({ component: 'notifications' }).error(
+        { err, userId: opts.userId, type: opts.type },
+        'Failed to enqueue notification'
+      );
+    });
+    return;
+  }
+
   _send(opts).catch((err: Error) => {
-    console.error('[Notification] Failed', { userId: opts.userId, type: opts.type, err: err.message });
+    contextualLogger({ component: 'notifications' }).error(
+      { err, userId: opts.userId, type: opts.type },
+      'Failed to deliver notification'
+    );
   });
 }
 

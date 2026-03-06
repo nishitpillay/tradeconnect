@@ -6,7 +6,8 @@ import { env } from '../config/env';
 
 export interface Conversation {
   id: string;
-  job_id: string;
+  job_id: string | null;
+  conversation_type: 'job' | 'admin_support';
   customer_id: string;
   provider_id: string;
   quote_id: string | null;
@@ -36,7 +37,8 @@ export interface Message {
 }
 
 export interface CreateConversationInput {
-  job_id: string;
+  job_id: string | null;
+  conversation_type?: 'job' | 'admin_support';
   customer_id: string;
   provider_id: string;
 }
@@ -44,7 +46,10 @@ export interface CreateConversationInput {
 export interface CreateMessageInput {
   conversation_id: string;
   sender_id: string;
-  body: string;
+  message_type?: 'text' | 'voice';
+  body?: string | null;
+  attachment_url?: string | null;
+  attachment_mime?: string | null;
   pii_detected?: boolean;
   pii_blocked?: boolean;
 }
@@ -80,16 +85,31 @@ export async function findConversationByParticipants(
   return rows[0] ?? null;
 }
 
+export async function findAdminSupportConversation(
+  customerId: string,
+  adminUserId: string
+): Promise<Conversation | null> {
+  const { rows } = await db.query<Conversation>(
+    `SELECT *
+     FROM conversations
+     WHERE conversation_type = 'admin_support'
+       AND customer_id = $1
+       AND provider_id = $2`,
+    [customerId, adminUserId]
+  );
+  return rows[0] ?? null;
+}
+
 export async function createConversation(
   input: CreateConversationInput,
   client?: PoolClient
 ): Promise<Conversation> {
   const q = (client ?? db) as QueryRunner;
   const { rows } = await q.query<Conversation>(
-    `INSERT INTO conversations (job_id, customer_id, provider_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO conversations (job_id, customer_id, provider_id, conversation_type)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [input.job_id, input.customer_id, input.provider_id]
+    [input.job_id, input.customer_id, input.provider_id, input.conversation_type ?? 'job']
   );
   return rows[0];
 }
@@ -105,6 +125,16 @@ export async function listConversations(userId: string): Promise<Conversation[]>
   return rows;
 }
 
+export async function listAllConversations(): Promise<Conversation[]> {
+  const { rows } = await db.query<Conversation>(
+    `SELECT *
+     FROM conversations
+     WHERE is_archived = FALSE
+     ORDER BY last_message_at DESC NULLS LAST, created_at DESC`
+  );
+  return rows;
+}
+
 // ── Messages ──────────────────────────────────────────────────────────────────
 
 export async function createMessage(
@@ -113,13 +143,18 @@ export async function createMessage(
 ): Promise<Message> {
   const q = (client ?? db) as QueryRunner;
   const { rows } = await q.query<Message>(
-    `INSERT INTO messages (conversation_id, sender_id, body, pii_detected, pii_blocked)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO messages (
+      conversation_id, sender_id, message_type, body, attachment_url, attachment_mime, pii_detected, pii_blocked
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       input.conversation_id,
       input.sender_id,
+      input.message_type ?? 'text',
       input.body,
+      input.attachment_url ?? null,
+      input.attachment_mime ?? null,
       input.pii_detected ?? false,
       input.pii_blocked ?? false,
     ]

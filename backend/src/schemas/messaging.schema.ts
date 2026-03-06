@@ -5,9 +5,23 @@ export const CreateConversationSchema = z.object({
   customer_id: z.string().uuid(),
 }).strict();
 
-export const SendMessageSchema = z.object({
-  body: z.string().min(1).max(5000),
+export const OpenAdminSupportConversationSchema = z.object({}).strict();
+
+const SendTextMessageSchema = z.object({
+  message_type: z.literal('text').optional(),
+  body: z.string().trim().min(1).max(5000),
+  attachment_url: z.undefined().optional(),
+  attachment_mime: z.undefined().optional(),
 }).strict();
+
+const SendVoiceMessageSchema = z.object({
+  message_type: z.literal('voice'),
+  body: z.string().trim().max(5000).optional(),
+  attachment_url: z.string().url(),
+  attachment_mime: z.string().regex(/^audio\//i, 'attachment_mime must be an audio mime type'),
+}).strict();
+
+export const SendMessageSchema = z.union([SendTextMessageSchema, SendVoiceMessageSchema]);
 
 export const ListMessagesQuerySchema = z.object({
   before: z.string().uuid().optional(),

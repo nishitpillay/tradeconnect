@@ -7,7 +7,7 @@ export async function listConversations(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
   try {
-    const conversations = await messagingService.listConversations(req.user!.userId);
+    const conversations = await messagingService.listConversations(req.user!.userId, req.user!.role);
     res.json({ conversations });
   } catch (err) {
     next(err);
@@ -32,6 +32,19 @@ export async function openConversation(
   }
 }
 
+// ── POST /api/conversations/admin-support ─────────────────────────────────────
+
+export async function openAdminSupportConversation(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const conversation = await messagingService.openAdminSupportConversation(req.user!.userId);
+    res.status(201).json({ conversation });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── GET /api/conversations/:id ────────────────────────────────────────────────
 
 export async function getConversation(
@@ -40,6 +53,7 @@ export async function getConversation(
   try {
     const conversation = await messagingService.getConversation(
       req.user!.userId,
+      req.user!.role,
       req.params.id
     );
     res.json({ conversation });
@@ -57,6 +71,7 @@ export async function listMessages(
     const { before, limit } = req.query as { before?: string; limit?: string };
     const messages = await messagingService.getMessages(
       req.user!.userId,
+      req.user!.role,
       req.params.id,
       before,
       limit ? Number(limit) : undefined
@@ -73,11 +88,16 @@ export async function sendMessage(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
   try {
-    const { body } = req.body as { body: string };
+    const payload = req.body as {
+      body?: string;
+      message_type?: 'text' | 'voice';
+      attachment_url?: string;
+      attachment_mime?: string;
+    };
     const message = await messagingService.sendMessage(
       req.user!.userId,
       req.params.id,
-      body
+      payload
     );
     res.status(201).json({ message });
   } catch (err) {
@@ -91,7 +111,7 @@ export async function markAsRead(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
   try {
-    await messagingService.markAsRead(req.user!.userId, req.params.id);
+    await messagingService.markAsRead(req.user!.userId, req.user!.role, req.params.id);
     res.json({ ok: true });
   } catch (err) {
     next(err);

@@ -1,43 +1,46 @@
-/**
- * Messaging Service
- *
- * Business logic for conversations and messages.
- *
- * Key rules:
- *   - Providers can open a conversation on any posted/quoting/awarded/in_progress job
- *   - Customers can only reply to conversations already opened by a provider
- *   - One conversation per (job_id, customer_id, provider_id) — DB enforced
- *   - PII in message bodies is blocked (400) and counted against the sender
- *   - Messages are broadcast via Socket.IO to conversation + recipient rooms
- */
-
 import * as messagingRepo from '../repositories/messaging.repo';
 import type { Conversation, Message } from '../repositories/messaging.repo';
 import { findJobById } from '../repositories/job.repo';
+import { findPrimaryActiveAdmin } from '../repositories/user.repo';
 import { Errors } from '../middleware/errors';
 import { getIo } from '../config/socket';
 import { notify } from './notification.service';
 
-// ── PII detection ─────────────────────────────────────────────────────────────
-
 const PII_PATTERNS = [
-  /\b04\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b/,       // AU mobile
-  /\b0[2-9]\d{8}\b/,                              // AU landline
-  /\b1[38]00[\s.-]?\d{3}[\s.-]?\d{3}\b/,        // AU freecall
-  /[\w.+]+@[\w.-]+\.[a-z]{2,}\b/i,               // email address
+  /\b04\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b/,
+  /\b0[2-9]\d{8}\b/,
+  /\b1[38]00[\s.-]?\d{3}[\s.-]?\d{3}\b/,
+  /[\w.+]+@[\w.-]+\.[a-z]{2,}\b/i,
+];
+
+const PROFANITY_PATTERNS = [
+  /\bfuck(?:ing|ed|er)?\b/i,
+  /\bshit(?:ty)?\b/i,
+  /\bbitch(?:es)?\b/i,
+  /\bcunt(?:s)?\b/i,
+  /\basshole(?:s)?\b/i,
+  /\bbastard(?:s)?\b/i,
+  /\bdickhead(?:s)?\b/i,
+  /\bmotherfucker(?:s)?\b/i,
 ];
 
 function containsPii(text: string): boolean {
   return PII_PATTERNS.some((re) => re.test(text));
 }
 
-// ── Business logic ────────────────────────────────────────────────────────────
+function containsProfanity(text: string): boolean {
+  return PROFANITY_PATTERNS.some((re) => re.test(text));
+}
 
 const OPEN_JOB_STATUSES = new Set(['posted', 'quoting', 'awarded', 'in_progress']);
 
-/**
- * Provider opens (or retrieves existing) conversation on a job.
- */
+export interface SendMessageInput {
+  message_type?: 'text' | 'voice';
+  body?: string;
+  attachment_url?: string;
+  attachment_mime?: string;
+}
+
 export async function openConversation(
   providerId: string,
   jobId: string,
@@ -56,84 +59,119 @@ export async function openConversation(
     throw Errors.badRequest('customer_id does not match the job owner.');
   }
 
-  // Upsert: return existing conversation or create a new one
   const existing = await messagingRepo.findConversationByParticipants(
     jobId, customerId, providerId
   );
   if (existing) return existing;
 
-  return messagingRepo.createConversation({ job_id: jobId, customer_id: customerId, provider_id: providerId });
+  return messagingRepo.createConversation({
+    job_id: jobId,
+    customer_id: customerId,
+    provider_id: providerId,
+  });
 }
 
-/**
- * Send a message. Runs PII scan; blocks and records violations.
- */
+export async function openAdminSupportConversation(requesterUserId: string): Promise<Conversation> {
+  const adminUser = await findPrimaryActiveAdmin(requesterUserId);
+  if (!adminUser) {
+    throw Errors.badRequest('No active TradeConnect Admin team member is available.');
+  }
+
+  const existing = await messagingRepo.findAdminSupportConversation(requesterUserId, adminUser.id);
+  if (existing) return existing;
+
+  return messagingRepo.createConversation({
+    job_id: null,
+    conversation_type: 'admin_support',
+    customer_id: requesterUserId,
+    provider_id: adminUser.id,
+  });
+}
+
 export async function sendMessage(
   userId: string,
   conversationId: string,
-  body: string
+  input: SendMessageInput
 ): Promise<Message> {
   const conversation = await messagingRepo.findConversationById(conversationId);
   if (!conversation) throw Errors.notFound('Conversation');
 
-  const isCustomer  = conversation.customer_id === userId;
-  const isProvider  = conversation.provider_id === userId;
-  if (!isCustomer && !isProvider) throw Errors.forbidden();
+  const isCustomer = conversation.customer_id === userId;
+  const isProvider = conversation.provider_id === userId;
+  const isParticipant = isCustomer || isProvider;
+  if (!isParticipant) throw Errors.forbidden();
 
-  // PII scan
-  if (containsPii(body)) {
-    // Fire-and-forget — violation tracking should not block response
-    messagingRepo.upsertPiiViolation(userId).catch((err: Error) => {
-      console.error('[Messaging] PII violation upsert failed:', err.message);
-    });
-    throw Errors.badRequest('Message blocked: contains contact information');
+  const messageType = input.message_type ?? 'text';
+  const body = input.body?.trim();
+  const attachmentUrl = input.attachment_url ?? null;
+  const attachmentMime = input.attachment_mime ?? null;
+
+  if (messageType === 'voice') {
+    if (!attachmentUrl || !attachmentMime || !attachmentMime.toLowerCase().startsWith('audio/')) {
+      throw Errors.badRequest('Voice message requires audio attachment_url and attachment_mime.');
+    }
+  } else {
+    if (!body) throw Errors.badRequest('Message body is required.');
+
+    if (containsProfanity(body)) {
+      throw Errors.badRequest('Message blocked: inappropriate language is not allowed.');
+    }
+
+    if (containsPii(body)) {
+      messagingRepo.upsertPiiViolation(userId).catch((err: Error) => {
+        console.error('[Messaging] PII violation upsert failed:', err.message);
+      });
+      throw Errors.badRequest('Message blocked: contains contact information');
+    }
   }
 
   const message = await messagingRepo.createMessage({
     conversation_id: conversationId,
     sender_id: userId,
-    body,
+    message_type: messageType,
+    body: body ?? null,
+    attachment_url: attachmentUrl,
+    attachment_mime: attachmentMime,
   });
 
-  // Determine recipient
   const recipientId = isCustomer ? conversation.provider_id : conversation.customer_id;
 
-  // Real-time emit (best-effort)
   const io = getIo();
   if (io) {
     io.to(`conversation:${conversationId}`).emit('new_message', { message });
     io.to(`user:${recipientId}`).emit('new_message', { conversationId, message });
   }
 
-  // Notification (fire-and-forget)
   notify({
     userId: recipientId,
-    type:    'new_message',
+    type: 'new_message',
     channel: 'in_app',
-    title:   'New message',
-    body:    body.length > 100 ? `${body.slice(0, 97)}…` : body,
-    data:    { conversationId },
+    title: 'New message',
+    body: messageType === 'voice'
+      ? 'Sent a voice recording'
+      : (body!.length > 100 ? `${body!.slice(0, 97)}...` : body!),
+    data: { conversationId },
   });
 
   return message;
 }
 
-/**
- * List all conversations for the authenticated user.
- */
-export async function listConversations(userId: string): Promise<Conversation[]> {
+export async function listConversations(userId: string, userRole: string): Promise<Conversation[]> {
+  if (userRole === 'admin') {
+    return messagingRepo.listAllConversations();
+  }
   return messagingRepo.listConversations(userId);
 }
 
-/**
- * Get a single conversation (participant only).
- */
 export async function getConversation(
   userId: string,
+  userRole: string,
   conversationId: string
 ): Promise<Conversation> {
   const conversation = await messagingRepo.findConversationById(conversationId);
   if (!conversation) throw Errors.notFound('Conversation');
+
+  if (userRole === 'admin') return conversation;
 
   const isParticipant =
     conversation.customer_id === userId || conversation.provider_id === userId;
@@ -142,17 +180,19 @@ export async function getConversation(
   return conversation;
 }
 
-/**
- * List messages in a conversation (paginated, oldest-first).
- */
 export async function getMessages(
   userId: string,
+  userRole: string,
   conversationId: string,
   before?: string,
   limit?: number
 ): Promise<Message[]> {
   const conversation = await messagingRepo.findConversationById(conversationId);
   if (!conversation) throw Errors.notFound('Conversation');
+
+  if (userRole === 'admin') {
+    return messagingRepo.listMessages(conversationId, before, limit);
+  }
 
   const isParticipant =
     conversation.customer_id === userId || conversation.provider_id === userId;
@@ -161,15 +201,17 @@ export async function getMessages(
   return messagingRepo.listMessages(conversationId, before, limit);
 }
 
-/**
- * Mark conversation as read (reset own unread count to 0).
- */
 export async function markAsRead(
   userId: string,
+  userRole: string,
   conversationId: string
 ): Promise<void> {
   const conversation = await messagingRepo.findConversationById(conversationId);
   if (!conversation) throw Errors.notFound('Conversation');
+
+  if (userRole === 'admin' && conversation.provider_id !== userId && conversation.customer_id !== userId) {
+    return;
+  }
 
   if (conversation.customer_id === userId) {
     await messagingRepo.markAsRead(conversationId, 'customer');
@@ -180,9 +222,6 @@ export async function markAsRead(
   }
 }
 
-/**
- * Soft-delete a message (sender or admin only).
- */
 export async function deleteMessage(
   userId: string,
   userRole: string,
@@ -200,12 +239,11 @@ export async function deleteMessage(
   if (message.is_deleted) throw Errors.notFound('Message');
 
   const isSender = message.sender_id === userId;
-  const isAdmin  = userRole === 'admin';
+  const isAdmin = userRole === 'admin';
   if (!isSender && !isAdmin) throw Errors.forbidden();
 
   const deleted = await messagingRepo.softDeleteMessage(messageId, userId);
 
-  // Notify room of deletion
   const io = getIo();
   if (io) {
     io.to(`conversation:${conversationId}`).emit('message_deleted', { messageId });

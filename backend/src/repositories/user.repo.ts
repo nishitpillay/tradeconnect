@@ -118,6 +118,27 @@ export async function findByEmail(email: string): Promise<User | null> {
   return rows[0] ?? null;
 }
 
+export async function findPrimaryActiveAdmin(excludeUserId?: string): Promise<User | null> {
+  const params: string[] = ['admin', 'active'];
+  let whereClause = 'WHERE role = $1 AND status = $2';
+
+  if (excludeUserId) {
+    params.push(excludeUserId);
+    whereClause += ` AND id <> $${params.length}`;
+  }
+
+  const { rows } = await db.query<User>(
+    `SELECT *
+     FROM users
+     ${whereClause}
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    params
+  );
+
+  return rows[0] ?? null;
+}
+
 export async function createUser(
   input: CreateUserInput,
   client?: PoolClient
