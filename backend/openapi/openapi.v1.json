@@ -1,0 +1,1325 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TradeConnect API",
+    "version": "0.1.0",
+    "description": "TradeConnect backend API contract (v1)."
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Versioned API base path"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Jobs"
+    },
+    {
+      "name": "Messaging"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "RegisterInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "allOf": [
+              {
+                "pattern": "[A-Z]"
+              },
+              {
+                "pattern": "[0-9]"
+              },
+              {
+                "pattern": "[^A-Za-z0-9]"
+              }
+            ]
+          },
+          "full_name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "pattern": "^[a-zA-Z\\s'\\-\\.]+$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "provider"
+            ]
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+61[2-9]\\d{8}$"
+          },
+          "business_name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "terms_accepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "privacy_accepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "marketing_consent": {
+            "type": "boolean",
+            "default": false
+          },
+          "referral_code": {
+            "type": "string",
+            "maxLength": 20
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "full_name",
+          "role",
+          "terms_accepted",
+          "privacy_accepted"
+        ],
+        "additionalProperties": false
+      },
+      "LoginInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "RequestPhoneOtpInput": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+61[2-9]\\d{8}$"
+          }
+        },
+        "required": [
+          "phone"
+        ],
+        "additionalProperties": false
+      },
+      "VerifyPhoneOtpInput": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+61[2-9]\\d{8}$"
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6,
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "phone",
+          "otp"
+        ],
+        "additionalProperties": false
+      },
+      "ForgotPasswordInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "ResetPasswordInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "allOf": [
+              {
+                "pattern": "[A-Z]"
+              },
+              {
+                "pattern": "[0-9]"
+              },
+              {
+                "pattern": "[^A-Za-z0-9]"
+              }
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "additionalProperties": false
+      },
+      "CreateJobInput": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subcategory_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 5000
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "emergency",
+              "within_48h",
+              "this_week",
+              "this_month",
+              "flexible"
+            ],
+            "default": "flexible"
+          },
+          "property_type": {
+            "type": "string",
+            "enum": [
+              "house",
+              "apartment",
+              "townhouse",
+              "commercial",
+              "land",
+              "other"
+            ]
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NSW",
+              "VIC",
+              "QLD",
+              "WA",
+              "SA",
+              "TAS",
+              "ACT",
+              "NT"
+            ]
+          },
+          "exact_address": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          },
+          "budget_min": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000000
+          },
+          "budget_max": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000000
+          },
+          "budget_is_gst": {
+            "type": "boolean",
+            "default": false
+          },
+          "preferred_start_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "preferred_end_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "time_window_notes": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "publish": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "category_id",
+          "title",
+          "description",
+          "suburb",
+          "postcode",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "PatchJobInput": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subcategory_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 5000
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "emergency",
+              "within_48h",
+              "this_week",
+              "this_month",
+              "flexible"
+            ],
+            "default": "flexible"
+          },
+          "property_type": {
+            "type": "string",
+            "enum": [
+              "house",
+              "apartment",
+              "townhouse",
+              "commercial",
+              "land",
+              "other"
+            ]
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NSW",
+              "VIC",
+              "QLD",
+              "WA",
+              "SA",
+              "TAS",
+              "ACT",
+              "NT"
+            ]
+          },
+          "exact_address": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          },
+          "budget_min": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000000
+          },
+          "budget_max": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000000
+          },
+          "budget_is_gst": {
+            "type": "boolean",
+            "default": false
+          },
+          "preferred_start_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "preferred_end_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "time_window_notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobFeedQuery": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NSW",
+              "VIC",
+              "QLD",
+              "WA",
+              "SA",
+              "TAS",
+              "ACT",
+              "NT"
+            ]
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "radius_km": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 500
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "budget_min": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "budget_max": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "newest",
+              "budget_high",
+              "budget_low",
+              "distance"
+            ],
+            "default": "recommended"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "MyJobsQuery": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "posted",
+              "quoting",
+              "awarded",
+              "in_progress",
+              "completed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubmitQuoteInput": {
+        "type": "object",
+        "properties": {
+          "quote_type": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "estimate_range",
+              "hourly",
+              "call_for_quote"
+            ]
+          },
+          "price_fixed": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "price_min": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "price_max": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "hourly_rate": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "is_gst_included": {
+            "type": "boolean",
+            "default": false
+          },
+          "scope_notes": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 3000
+          },
+          "inclusions": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "exclusions": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "timeline_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 730
+          },
+          "warranty_months": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120
+          }
+        },
+        "required": [
+          "quote_type"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteActionInput": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "viewed",
+              "shortlisted",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "AwardJobInput": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "quote_id"
+        ],
+        "additionalProperties": false
+      },
+      "CreateConversationInput": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "job_id",
+          "customer_id"
+        ],
+        "additionalProperties": false
+      },
+      "SendMessageInput": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "message_type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000
+              },
+              "attachment_url": {
+                "not": {}
+              },
+              "attachment_mime": {
+                "not": {}
+              }
+            },
+            "required": [
+              "body"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "message_type": {
+                "type": "string",
+                "enum": [
+                  "voice"
+                ]
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 5000
+              },
+              "attachment_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "attachment_mime": {
+                "type": "string",
+                "pattern": "^audio\\/"
+              }
+            },
+            "required": [
+              "message_type",
+              "attachment_url",
+              "attachment_mime"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ListMessagesQuery": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuthSessionResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "provider",
+                  "admin"
+                ]
+              },
+              "status": {
+                "type": "string"
+              },
+              "full_name": {
+                "type": "string"
+              },
+              "email_verified": {
+                "type": "boolean"
+              },
+              "phone_verified": {
+                "type": "boolean"
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "role",
+              "status",
+              "full_name",
+              "email_verified",
+              "phone_verified",
+              "created_at"
+            ],
+            "additionalProperties": false
+          },
+          "access_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "csrf_token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "user",
+          "access_token",
+          "csrf_token"
+        ],
+        "additionalProperties": false
+      },
+      "AuthRefreshResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "csrf_token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "access_token",
+          "csrf_token"
+        ],
+        "additionalProperties": false
+      },
+      "JobsListResponse": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobs"
+        ],
+        "additionalProperties": false
+      },
+      "MessagesListResponse": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "conversation_id": {
+                  "type": "string"
+                },
+                "sender_id": {
+                  "type": "string"
+                },
+                "message_type": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "conversation_id",
+                "sender_id",
+                "message_type",
+                "body",
+                "created_at"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "fields"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "details"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Authenticated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Rotated tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthRefreshResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer jobs list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job created"
+          },
+          "400": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/jobs/feed": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{id}/quotes": {
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitQuoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quote created"
+          }
+        }
+      }
+    },
+    "/conversations": {
+      "get": {
+        "tags": [
+          "Messaging"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversations list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Messaging"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conversation opened"
+          }
+        }
+      }
+    },
+    "/conversations/{id}/messages": {
+      "get": {
+        "tags": [
+          "Messaging"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Messaging"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message created"
+          }
+        }
+      }
+    }
+  }
+}

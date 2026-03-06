@@ -16,6 +16,9 @@
     "dev:stack": "powershell -ExecutionPolicy Bypass -File scripts/dev-stack.ps1",
     "smoke:stack": "powershell -ExecutionPolicy Bypass -File scripts/smoke-stack.ps1",
     "smoke:queue": "tsx --env-file=.env src/scripts/queue-smoke.ts",
+    "openapi:generate": "tsx src/scripts/generate-openapi.ts",
+    "openapi:check-drift": "tsx src/scripts/check-openapi-drift.ts",
+    "test:contract": "jest src/contracts/__tests__/api-response.contract.test.ts --runInBand",
     "seed:test": "tsx --env-file=.env src/scripts/seed-test-accounts.ts",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -76,6 +79,7 @@
     "jest": "^30.2.0",
     "node-pg-migrate": "^8.0.4",
     "pino-pretty": "^11.2.2",
+    "zod-to-json-schema": "^3.24.6",
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3"

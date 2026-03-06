@@ -1,5 +1,7 @@
 import './observability/tracing';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import express, { Request, Response } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -35,6 +37,7 @@ import { conversationRoom, LEGACY_SOCKET_EVENTS, SOCKET_EVENTS, userRoom } from 
 initSentry('tradeconnect-backend-api');
 
 const app = express();
+const API_VERSION = 'v1';
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -95,15 +98,45 @@ app.get('/health', async (_req: Request, res: Response) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/jobs', jobsRoutes);
-app.use('/api/profiles', profilesRoutes);
-app.use('/api/conversations', messagingRoutes);
-app.use('/api/reviews', reviewsRoutes);
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/verifications', verificationsRoutes);
-app.use('/api/admin', adminRoutes);
+function mountApiRoutes(router: ReturnType<typeof express.Router>): void {
+  router.use('/auth', authRoutes);
+  router.use('/jobs', jobsRoutes);
+  router.use('/profiles', profilesRoutes);
+  router.use('/conversations', messagingRoutes);
+  router.use('/reviews', reviewsRoutes);
+  router.use('/disputes', disputesRoutes);
+  router.use('/notifications', notificationsRoutes);
+  router.use('/verifications', verificationsRoutes);
+  router.use('/admin', adminRoutes);
+}
+
+app.get(`/api/${API_VERSION}/openapi.json`, (_req: Request, res: Response) => {
+  const specPath = path.resolve(process.cwd(), 'openapi', `openapi.${API_VERSION}.json`);
+  if (!fs.existsSync(specPath)) {
+    res.status(404).json({
+      message: `OpenAPI spec not found. Run 'npm run openapi:generate' in backend first.`,
+    });
+    return;
+  }
+  res.sendFile(specPath);
+});
+
+const apiV1Router = express.Router();
+mountApiRoutes(apiV1Router);
+app.use(`/api/${API_VERSION}`, apiV1Router);
+
+const legacyApiRouter = express.Router();
+legacyApiRouter.use((req: Request, res: Response, next) => {
+  if (req.path.startsWith(`/${API_VERSION}`)) {
+    return next('router');
+  }
+  res.setHeader('Deprecation', 'true');
+  res.setHeader('Sunset', 'Tue, 30 Jun 2026 00:00:00 GMT');
+  res.setHeader('Link', `</api/${API_VERSION}>; rel="successor-version"`);
+  next();
+});
+mountApiRoutes(legacyApiRouter);
+app.use('/api', legacyApiRouter);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ message: 'Route not found' });

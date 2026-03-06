@@ -36,6 +36,37 @@ npm run migrate:status
 - `GET /readyz` readiness (DB + Redis + pending migration check across legacy + Knex)
 - `GET /health` compatibility endpoint
 
+## API Versioning
+
+- Preferred base path: `/api/v1`
+- Legacy compatibility path: `/api` (deprecated; emits `Deprecation`, `Sunset`, and `Link` headers)
+- Migration path:
+  - Existing web/mobile clients can continue using `/api` short-term.
+  - New integrations should switch to `/api/v1`.
+  - Once all clients move, `/api` can be removed safely.
+
+## API Contract (OpenAPI)
+
+- Generate contract: `npm run openapi:generate`
+- Output file: `backend/openapi/openapi.v1.json`
+- Serve contract at runtime: `GET /api/v1/openapi.json`
+- Drift guard: `npm run openapi:check-drift`
+  - If OpenAPI changes, CI requires either:
+    - `backend/package.json` version bump, or
+    - `backend/CHANGELOG.md` update.
+
+Example generated client usage:
+
+```bash
+npx openapi-typescript backend/openapi/openapi.v1.json -o web/src/lib/api/generated/tradeconnect-api.ts
+```
+
+```ts
+import type { paths } from '@/lib/api/generated/tradeconnect-api';
+
+type LoginRequest = paths['/auth/login']['post']['requestBody']['content']['application/json'];
+```
+
 ## Worker Split
 
 - API entrypoint: `src/app.ts`

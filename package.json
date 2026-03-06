@@ -6,6 +6,8 @@
     "smoke:all": "powershell -ExecutionPolicy Bypass -File scripts/smoke-all.ps1",
     "shared:build": "npm --prefix packages/shared run build",
     "backend:build": "npm --prefix backend run build",
+    "backend:openapi:generate": "npm --prefix backend run openapi:generate",
+    "backend:openapi:check": "npm --prefix backend run openapi:check-drift",
     "backend:test": "npm --prefix backend test -- --runInBand",
     "web:type-check": "npm --prefix web run type-check",
     "web:build": "npm --prefix web run build",

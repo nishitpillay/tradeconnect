@@ -62,6 +62,8 @@ This repo is now the TradeConnect monorepo root and tracks the cross-app workspa
   Runs backend and web smoke checks, isolated web production verification, and the mobile Android smoke test.
 - `npm run shared:build`
 - `npm run backend:build`
+- `npm run backend:openapi:generate`
+- `npm run backend:openapi:check`
 - `npm run backend:test`
 - `npm run web:type-check`
 - `npm run web:build`
