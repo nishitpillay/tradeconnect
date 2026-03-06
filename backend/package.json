@@ -5,10 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/app.ts",
-    "worker:dev": "tsx watch src/worker.ts",
+    "worker:dev": "tsx watch src/worker/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/app.js",
-    "worker:start": "node dist/worker.js",
+    "start": "node dist/src/app.js",
+    "worker:start": "node dist/src/worker/index.js",
     "db:seed": "tsx --env-file=.env db/seeds/run.ts",
     "dev:stack": "powershell -ExecutionPolicy Bypass -File scripts/dev-stack.ps1",
     "smoke:stack": "powershell -ExecutionPolicy Bypass -File scripts/smoke-stack.ps1",

@@ -3,13 +3,14 @@ import { env } from './env';
 import { contextualLogger } from '../observability/logger';
 
 const log = contextualLogger({ component: 'database' });
+const sslEnabled = env.DB_SSL_ENABLED ?? (env.NODE_ENV === 'production');
 
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: env.DB_POOL_MAX,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+  ssl: sslEnabled ? { rejectUnauthorized: true } : false,
 });
 
 pool.on('connect', async (client: PoolClient) => {

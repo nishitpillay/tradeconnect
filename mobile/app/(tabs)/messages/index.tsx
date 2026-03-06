@@ -7,9 +7,10 @@ import {
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { messagingAPI } from '../../../src/api/messaging.api';
 import { useSessionStore } from '../../../src/stores/sessionStore';
 import type { Conversation } from '../../../src/types';
@@ -36,18 +37,20 @@ function formatTime(iso: string | null): string {
 interface ConversationRowProps {
   item: Conversation;
   currentUserId: string;
-  currentRole: 'customer' | 'provider' | null;
   onPress: (id: string) => void;
 }
 
-function ConversationRow({ item, currentUserId, currentRole, onPress }: ConversationRowProps) {
-  const otherUser = currentRole === 'customer' ? item.provider : item.customer;
+function ConversationRow({ item, currentUserId, onPress }: ConversationRowProps) {
+  const isCurrentUserCustomer = item.customer_id === currentUserId;
+  const otherUser = isCurrentUserCustomer ? item.provider : item.customer;
   const otherName = otherUser?.display_name || otherUser?.full_name || 'User';
-  const unread = currentRole === 'customer' ? item.customer_unread : item.provider_unread;
+  const unread = isCurrentUserCustomer ? item.customer_unread : item.provider_unread;
 
   const lastBody = item.last_message?.is_deleted
     ? 'Message deleted'
-    : item.last_message?.body || '';
+    : item.last_message?.message_type === 'voice'
+      ? 'Voice recording'
+      : item.last_message?.body || '';
 
   const preview =
     item.last_message?.sender_id === currentUserId ? `You: ${lastBody}` : lastBody;
@@ -99,7 +102,8 @@ function ConversationRow({ item, currentUserId, currentRole, onPress }: Conversa
 
 export default function MessagesScreen() {
   const router = useRouter();
-  const { user, role } = useSessionStore();
+  const queryClient = useQueryClient();
+  const { user } = useSessionStore();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['conversations'],
@@ -113,6 +117,17 @@ export default function MessagesScreen() {
     },
     [router],
   );
+
+  const { mutate: openAdminSupport, isPending: isOpeningAdminSupport } = useMutation({
+    mutationFn: () => messagingAPI.openAdminSupportConversation(),
+    onSuccess: ({ conversation }) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      router.push(`/messages/${conversation.id}`);
+    },
+    onError: () => {
+      Alert.alert('Support unavailable', 'Unable to open the TradeConnect Admin chat right now.');
+    },
+  });
 
   if (isLoading) {
     return (
@@ -137,6 +152,18 @@ export default function MessagesScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.supportCtaWrap}>
+        <TouchableOpacity
+          style={[styles.supportCta, isOpeningAdminSupport && styles.supportCtaDisabled]}
+          disabled={isOpeningAdminSupport}
+          onPress={() => openAdminSupport()}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.supportCtaText}>
+            {isOpeningAdminSupport ? 'Opening support...' : 'Message TradeConnect Admin Team'}
+          </Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id}
@@ -144,7 +171,6 @@ export default function MessagesScreen() {
           <ConversationRow
             item={item}
             currentUserId={user?.id ?? ''}
-            currentRole={role}
             onPress={handlePress}
           />
         )}
@@ -156,7 +182,7 @@ export default function MessagesScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptySubtitle}>
-              Conversations start when a provider submits a quote on your job.
+              Conversations start from quotes, or open a direct chat with TradeConnect Admin Team.
             </Text>
           </View>
         }
@@ -172,6 +198,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  supportCtaWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  supportCta: {
+    backgroundColor: '#0EA5E9',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  supportCtaDisabled: {
+    backgroundColor: '#7DD3FC',
+  },
+  supportCtaText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   center: {
     flex: 1,

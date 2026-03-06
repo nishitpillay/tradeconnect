@@ -20,6 +20,7 @@ import {
   revokeAllUserTokens,
   hashToken,
   JWTPayload,
+  RefreshTokenContext,
 } from './jwt.service';
 import { writeLog } from './audit.service';
 import { notify } from './notification.service';
@@ -42,12 +43,14 @@ export interface RegisterInput {
   privacy_accepted: true;
   marketing_consent: boolean;
   referral_code?: string;
+  tokenContext?: RefreshTokenContext;
 }
 
 export async function register(input: RegisterInput): Promise<{
   user: userRepo.User;
   access_token: string;
   refresh_token: string;
+  csrf_token: string;
 }> {
   // Prevent duplicate emails
   const existing = await userRepo.findByEmail(input.email);
@@ -100,7 +103,7 @@ export async function register(input: RegisterInput): Promise<{
     user.email_verified = true;
   } else {
     // Send email verification link (fire-and-forget)
-    sendEmailVerification(user.id, user.email);
+    void sendEmailVerification(user.id, user.email).catch(() => null);
   }
 
   writeLog({ action: 'user_created', actorId: user.id, targetType: 'user', targetId: user.id });
@@ -112,12 +115,15 @@ export async function register(input: RegisterInput): Promise<{
     identity_verified: false,
   };
 
-  const [access_token, refresh_token] = await Promise.all([
-    Promise.resolve(signAccessToken(payload)),
-    signRefreshToken(user.id),
-  ]);
+  const access_token = signAccessToken(payload);
+  const refreshIssue = await signRefreshToken(user.id, input.tokenContext);
 
-  return { user, access_token, refresh_token };
+  return {
+    user,
+    access_token,
+    refresh_token: refreshIssue.token,
+    csrf_token: crypto.randomBytes(24).toString('hex'),
+  };
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
@@ -125,12 +131,14 @@ export async function register(input: RegisterInput): Promise<{
 export interface LoginInput {
   email: string;
   password: string;
+  tokenContext?: RefreshTokenContext;
 }
 
 export async function login(input: LoginInput): Promise<{
   user: userRepo.User;
   access_token: string;
   refresh_token: string;
+  csrf_token: string;
 }> {
   const user = await userRepo.findByEmail(input.email);
 
@@ -168,12 +176,15 @@ export async function login(input: LoginInput): Promise<{
     identity_verified: providerProfile?.identity_verified === true,
   };
 
-  const [access_token, refresh_token] = await Promise.all([
-    Promise.resolve(signAccessToken(payload)),
-    signRefreshToken(user.id),
-  ]);
+  const access_token = signAccessToken(payload);
+  const refreshIssue = await signRefreshToken(user.id, input.tokenContext);
 
-  return { user, access_token, refresh_token };
+  return {
+    user,
+    access_token,
+    refresh_token: refreshIssue.token,
+    csrf_token: crypto.randomBytes(24).toString('hex'),
+  };
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────────
@@ -187,9 +198,30 @@ export async function logout(refreshToken: string): Promise<void> {
 export async function refreshTokens(refreshToken: string): Promise<{
   access_token: string;
   refresh_token: string;
+  csrf_token: string;
 }> {
   const { accessToken, refreshToken: newRefreshToken } = await rotateRefreshToken(refreshToken);
-  return { access_token: accessToken, refresh_token: newRefreshToken };
+  return {
+    access_token: accessToken,
+    refresh_token: newRefreshToken,
+    csrf_token: crypto.randomBytes(24).toString('hex'),
+  };
+}
+
+export async function refreshTokensWithContext(
+  refreshToken: string,
+  tokenContext: RefreshTokenContext
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  csrf_token: string;
+}> {
+  const { accessToken, refreshToken: newRefreshToken } = await rotateRefreshToken(refreshToken, tokenContext);
+  return {
+    access_token: accessToken,
+    refresh_token: newRefreshToken,
+    csrf_token: crypto.randomBytes(24).toString('hex'),
+  };
 }
 
 // ── Email Verification ────────────────────────────────────────────────────────
@@ -200,8 +232,8 @@ export async function sendEmailVerification(userId: string, _email: string): Pro
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   await db.query(
-    `INSERT INTO auth_tokens (user_id, token_hash, token_type, expires_at)
-     VALUES ($1, $2, 'email_verify', $3)`,
+    `INSERT INTO auth_tokens (user_id, token_hash, token_type, expires_at, issued_at, last_used_at)
+     VALUES ($1, $2, 'email_verify', $3, NOW(), NOW())`,
     [userId, hash, expiresAt]
   );
 
@@ -309,8 +341,8 @@ export async function forgotPassword(email: string): Promise<void> {
   );
 
   await db.query(
-    `INSERT INTO auth_tokens (user_id, token_hash, token_type, expires_at)
-     VALUES ($1, $2, 'password_reset', $3)`,
+    `INSERT INTO auth_tokens (user_id, token_hash, token_type, expires_at, issued_at, last_used_at)
+     VALUES ($1, $2, 'password_reset', $3, NOW(), NOW())`,
     [user.id, hash, expiresAt]
   );
 

@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { APIError } from '@/types';
+import { socketClient } from '../socket/client';
 
 type APIRequestConfig = AxiosRequestConfig & {
   _retry?: boolean;
@@ -28,6 +29,9 @@ class APIClient {
     // Request interceptor - attach access token
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
+        if (config.headers) {
+          config.headers['X-Client-Type'] = 'web';
+        }
         const { accessToken } = useAuthStore.getState();
         if (accessToken && config.headers) {
           config.headers.Authorization = `Bearer ${accessToken}`;
@@ -81,14 +85,19 @@ class APIClient {
 
     this.refreshTokenPromise = (async () => {
       try {
+        const csrfToken = readCookie('csrf_token');
         const response = await axios.post(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
           {},
-          { withCredentials: true } // Send refresh token cookie
+          {
+            withCredentials: true, // Send refresh token cookie
+            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+          }
         );
 
         const { access_token } = response.data;
         useAuthStore.getState().setAccessToken(access_token);
+        socketClient.updateAccessToken(access_token);
 
         return access_token;
       } finally {
@@ -150,3 +159,12 @@ class APIClient {
 }
 
 export const apiClient = new APIClient();
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookie = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${name}=`));
+  if (!cookie) return null;
+  return decodeURIComponent(cookie.split('=').slice(1).join('='));
+}

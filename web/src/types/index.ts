@@ -1,5 +1,5 @@
 // User and Auth types
-export type UserRole = 'customer' | 'provider';
+export type UserRole = 'customer' | 'provider' | 'admin';
 export type UserStatus = 'active' | 'suspended' | 'deleted';
 
 export interface User {
@@ -96,13 +96,16 @@ export interface Quote {
 // Messaging types
 export interface Conversation {
   id: string;
-  job_id: string;
+  job_id: string | null;
+  conversation_type?: 'job' | 'admin_support';
   customer_id: string;
   provider_id: string;
   last_message: string | null;
   last_message_at: string | null;
   unread_count_customer: number;
   unread_count_provider: number;
+  customer_unread?: number;
+  provider_unread?: number;
   created_at: string;
   updated_at: string;
   job?: Job;
@@ -115,7 +118,9 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   body: string | null;
-  message_type: 'text' | 'image' | 'system' | 'quote_event';
+  message_type: 'text' | 'voice' | 'image' | 'system' | 'quote_event';
+  attachment_url: string | null;
+  attachment_mime: string | null;
   is_deleted: boolean;
   read_by_recipient_at: string | null;
   created_at: string;

@@ -9,18 +9,35 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+const envBoolean = (defaultValue?: boolean) =>
+  z.preprocess((value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '') return undefined;
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+        return false;
+      }
+    }
+    return value;
+  }, defaultValue === undefined ? z.boolean().optional() : z.boolean().default(defaultValue));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   API_BASE_URL: z.string().url(),
 
   DATABASE_URL: z.string().min(1),
+  DB_SSL_ENABLED: envBoolean(),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   SLOW_QUERY_MS: z.coerce.number().int().min(0).default(300),
   DB_ENCRYPTION_KEY: z.string().min(32),
 
   JWT_SECRET: z.string().min(32),
-  JWT_EXPIRY: z.string().default('1h'),
+  JWT_EXPIRY: z.string().default('15m'),
   REFRESH_TOKEN_EXPIRY: z.string().default('30d'),
 
   AWS_REGION: z.string().default('ap-southeast-2'),
@@ -51,11 +68,16 @@ const envSchema = z.object({
   SENTRY_DSN: optionalUrl,
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.2),
   SENTRY_PROFILES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.0),
-  OTEL_ENABLED: z.coerce.boolean().default(true),
+  OTEL_ENABLED: envBoolean(true),
   OTEL_SERVICE_NAME: z.string().default('tradeconnect-backend'),
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(5),
-  NOTIFICATIONS_USE_QUEUE: z.coerce.boolean().default(true),
+  WORKER_METRICS_INTERVAL_MS: z.coerce.number().int().min(5000).default(60000),
+  WORKER_DLQ_ENABLED: envBoolean(true),
+  NOTIFICATIONS_USE_QUEUE: envBoolean(true),
+  NOTIFICATION_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(25).default(5),
+  NOTIFICATION_BACKOFF_MS: z.coerce.number().int().min(100).default(1000),
+  NOTIFICATION_DEDUPE_TTL_SECONDS: z.coerce.number().int().min(1).default(300),
 
   JOB_EXPIRY_DAYS: z.coerce.number().int().default(30),
   QUOTE_EXPIRY_DAYS: z.coerce.number().int().default(14),

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import * as authService from '../services/auth.service';
 import * as userRepo from '../repositories/user.repo';
 
@@ -6,14 +7,21 @@ import * as userRepo from '../repositories/user.repo';
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { user, access_token, refresh_token } = await authService.register(req.body);
+    const tokenContext = buildTokenContext(req);
+    const { user, access_token, refresh_token, csrf_token } = await authService.register({
+      ...req.body,
+      tokenContext,
+    });
 
-    // Refresh token in HttpOnly cookie; access token in body
+    setDeviceCookie(res, tokenContext.deviceId!);
     res.cookie('refresh_token', refresh_token, cookieOptions());
+    res.cookie('csrf_token', csrf_token, csrfCookieOptions());
+    const includeRefreshToken = shouldIncludeRefreshTokenInBody(req);
     res.status(201).json({
       user: sanitiseUser(user),
       access_token,
-      refresh_token, // included for mobile clients that can't use cookies
+      ...(includeRefreshToken ? { refresh_token } : {}),
+      csrf_token,
     });
   } catch (err) {
     next(err);
@@ -24,13 +32,21 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { user, access_token, refresh_token } = await authService.login(req.body);
+    const tokenContext = buildTokenContext(req);
+    const { user, access_token, refresh_token, csrf_token } = await authService.login({
+      ...req.body,
+      tokenContext,
+    });
 
+    setDeviceCookie(res, tokenContext.deviceId!);
     res.cookie('refresh_token', refresh_token, cookieOptions());
+    res.cookie('csrf_token', csrf_token, csrfCookieOptions());
+    const includeRefreshToken = shouldIncludeRefreshTokenInBody(req);
     res.json({
       user: sanitiseUser(user),
       access_token,
-      refresh_token, // included for mobile clients that can't use cookies
+      ...(includeRefreshToken ? { refresh_token } : {}),
+      csrf_token,
     });
   } catch (err) {
     next(err);
@@ -50,6 +66,7 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
     }
 
     res.clearCookie('refresh_token', cookieOptions());
+    res.clearCookie('csrf_token', csrfCookieOptions());
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -69,10 +86,18 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    const { access_token, refresh_token } = await authService.refreshTokens(rawToken);
+    const tokenContext = buildTokenContext(req);
+    const { access_token, refresh_token, csrf_token } = await authService.refreshTokensWithContext(rawToken, tokenContext);
 
+    setDeviceCookie(res, tokenContext.deviceId!);
     res.cookie('refresh_token', refresh_token, cookieOptions());
-    res.json({ access_token, refresh_token });
+    res.cookie('csrf_token', csrf_token, csrfCookieOptions());
+    const includeRefreshToken = shouldIncludeRefreshTokenInBody(req);
+    res.json({
+      access_token,
+      ...(includeRefreshToken ? { refresh_token } : {}),
+      csrf_token,
+    });
   } catch (err) {
     next(err);
   }
@@ -186,4 +211,58 @@ function cookieOptions() {
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days ms
     path: '/api/auth',
   };
+}
+
+function csrfCookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: false,
+    secure: isProd,
+    sameSite: 'strict' as const,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: '/api/auth',
+  };
+}
+
+function deviceCookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: false,
+    secure: isProd,
+    sameSite: 'lax' as const,
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+}
+
+function setDeviceCookie(res: Response, deviceId: string) {
+  res.cookie('device_id', deviceId, deviceCookieOptions());
+}
+
+function buildTokenContext(req: Request) {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ipAddress = Array.isArray(forwarded)
+    ? forwarded[0]
+    : typeof forwarded === 'string'
+      ? forwarded.split(',')[0]?.trim()
+      : req.ip ?? null;
+  const userAgent = req.get('user-agent') ?? null;
+  const headerDeviceId = req.get('x-device-id')?.trim();
+  const cookieDeviceId = (req.cookies?.device_id as string | undefined)?.trim();
+  const deviceId = headerDeviceId || cookieDeviceId || randomUUID();
+
+  return {
+    deviceId,
+    ipAddress,
+    userAgent,
+  };
+}
+
+function shouldIncludeRefreshTokenInBody(req: Request): boolean {
+  const explicitClientType = req.get('x-client-type')?.toLowerCase();
+  if (explicitClientType === 'mobile' || explicitClientType === 'native') return true;
+
+  // Browser requests generally include Origin for CORS POST calls.
+  // Native clients typically do not, and rely on body refresh_token.
+  return !req.get('origin');
 }

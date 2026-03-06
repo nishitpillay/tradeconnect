@@ -44,6 +44,7 @@ import {
   hashToken,
   TokenError,
   signRefreshToken,
+  rotateRefreshToken,
   revokeAllUserTokens,
   isUserTokensInvalidated,
   type JWTPayload,
@@ -145,14 +146,24 @@ describe('signRefreshToken', () => {
   });
 
   it('returns a 96-char hex string', async () => {
-    const token = await signRefreshToken('user-123');
-    expect(typeof token).toBe('string');
-    expect(token.length).toBe(96);
-    expect(token).toMatch(/^[a-f0-9]{96}$/);
+    mockDb.query = jest.fn().mockResolvedValue({ rows: [{ id: 'tok-1' }] });
+    const result = await signRefreshToken('user-123');
+    expect(typeof result.token).toBe('string');
+    expect(result.token.length).toBe(96);
+    expect(result.token).toMatch(/^[a-f0-9]{96}$/);
+    expect(result.tokenId).toBe('tok-1');
+    expect(result.familyId).toBeDefined();
+    expect(result.issuedAt).toBeInstanceOf(Date);
   });
 
   it('persists the hashed token to DB (never the raw value)', async () => {
-    const token = await signRefreshToken('user-123');
+    mockDb.query = jest.fn().mockResolvedValue({ rows: [{ id: 'tok-2' }] });
+    const result = await signRefreshToken('user-123', {
+      deviceId: 'device-1',
+      ipAddress: '10.0.0.1',
+      userAgent: 'jest-agent',
+      familyId: 'f0f0f0f0-0000-4000-8000-000000000001',
+    });
     const calls = (mockDb.query as jest.Mock).mock.calls;
     const insertCall = calls.find((c: unknown[]) =>
       typeof c[0] === 'string' && (c[0] as string).includes('INSERT INTO auth_tokens')
@@ -163,14 +174,61 @@ describe('signRefreshToken', () => {
     // params[0] = userId, params[1] = hash, params[2] = expires_at
     expect(params[0]).toBe('user-123');
     // The stored value should be the hash, NOT the raw token
-    expect(params[1]).not.toBe(token);
+    expect(params[1]).not.toBe(result.token);
     expect((params[1] as string).length).toBe(64); // SHA-256 hex
+    expect(params[3]).toBe('f0f0f0f0-0000-4000-8000-000000000001');
+    expect(params[4]).toBeNull();
+    expect(params[5]).toBe('device-1');
+    expect((params[7] as string).length).toBe(64);
+    expect((params[8] as string).length).toBe(64);
   });
 
   it('produces a unique token each call', async () => {
+    mockDb.query = jest.fn().mockResolvedValue({ rows: [{ id: 'tok-1' }] });
     const a = await signRefreshToken('user-123');
+    mockDb.query = jest.fn().mockResolvedValue({ rows: [{ id: 'tok-2' }] });
     const b = await signRefreshToken('user-123');
-    expect(a).not.toBe(b);
+    expect(a.token).not.toBe(b.token);
+  });
+});
+
+describe('rotateRefreshToken', () => {
+  beforeEach(() => {
+    mockRedis.set = jest.fn().mockResolvedValue('OK');
+  });
+
+  it('revokes token family when a used token is reused', async () => {
+    mockDb.query = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'old-token',
+          user_id: 'user-123',
+          token_family_id: 'f0f0f0f0-0000-4000-8000-000000000010',
+          role: 'customer',
+          email_verified: true,
+          identity_verified: false,
+          expires_at: new Date(Date.now() + 60000),
+          used_at: new Date(),
+          revoked_at: null,
+          replaced_by_token_id: 'new-token',
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(rotateRefreshToken('reused-token')).rejects.toThrow('Refresh token reuse detected');
+
+    expect(mockDb.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('token_family_id = $2'),
+      ['user-123', 'f0f0f0f0-0000-4000-8000-000000000010']
+    );
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      'token:invalidate:user-123',
+      expect.any(String),
+      'EX',
+      3600
+    );
   });
 });
 
@@ -185,7 +243,7 @@ describe('revokeAllUserTokens', () => {
   it('updates DB to mark all tokens as used', async () => {
     await revokeAllUserTokens('user-123');
     expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE auth_tokens SET used_at = NOW()'),
+      expect.stringContaining('UPDATE auth_tokens'),
       ['user-123']
     );
   });

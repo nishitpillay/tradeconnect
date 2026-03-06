@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,8 +18,6 @@ import { messagingAPI } from '../../../src/api/messaging.api';
 import { useSessionStore } from '../../../src/stores/sessionStore';
 import { useSocketStore, type NewMessagePayload } from '../../../src/stores/socketStore';
 import type { Message } from '../../../src/types';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatMessageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
@@ -42,8 +41,6 @@ function formatDateDivider(iso: string): string {
   if (diffDays === 1) return 'Yesterday';
   return date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 }
-
-// ── Message Bubble ────────────────────────────────────────────────────────────
 
 interface BubbleProps {
   message: Message;
@@ -78,6 +75,8 @@ function MessageBubble({ message, isMe, showAvatar }: BubbleProps) {
     );
   }
 
+  const isVoice = message.message_type === 'voice' && !!message.attachment_url;
+
   return (
     <View style={[styles.bubbleRow, isMe && styles.bubbleRowMe]}>
       {!isMe && showAvatar ? (
@@ -89,19 +88,39 @@ function MessageBubble({ message, isMe, showAvatar }: BubbleProps) {
       )}
 
       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-        <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-          {message.body}
-        </Text>
+        {isVoice ? (
+          <View>
+            <Text style={[styles.voiceLabel, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+              Voice recording
+            </Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(message.attachment_url as string)}
+              activeOpacity={0.75}
+              style={[styles.voiceButton, isMe ? styles.voiceButtonMe : styles.voiceButtonThem]}
+            >
+              <Text style={[styles.voiceButtonText, isMe ? styles.voiceButtonTextMe : styles.voiceButtonTextThem]}>
+                Play audio
+              </Text>
+            </TouchableOpacity>
+            {message.body ? (
+              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+                {message.body}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+            {message.body}
+          </Text>
+        )}
         <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeThem]}>
           {formatMessageTime(message.created_at)}
-          {isMe && message.read_by_recipient_at ? '  ✓✓' : ''}
+          {isMe && message.read_by_recipient_at ? '  Read' : ''}
         </Text>
       </View>
     </View>
   );
 }
-
-// ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,38 +136,29 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList<Message>>(null);
   const hasScrolledToBottom = useRef(false);
 
-  // ── Load conversation meta ──────────────────────────────────────────────────
-
   const { data: conversation } = useQuery({
     queryKey: ['conversation', id],
     queryFn: () => messagingAPI.getConversationById(id).then((r) => r.conversation),
     enabled: !!id,
   });
 
-  // ── Load message history ────────────────────────────────────────────────────
-
   const { isLoading, isError } = useQuery({
     queryKey: ['messages', id],
     queryFn: async () => {
       const result = await messagingAPI.getMessages(id);
-      // Messages come newest-first from the backend; reverse for display
       setMessages([...result.messages].reverse());
       return result.messages;
     },
     enabled: !!id,
   });
 
-  // ── Set header title ────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (!conversation || !user) return;
-    const other =
-      user.role === 'customer' ? conversation.provider : conversation.customer;
+    const isCurrentUserCustomer = conversation.customer_id === user.id;
+    const other = isCurrentUserCustomer ? conversation.provider : conversation.customer;
     const name = other?.display_name || other?.full_name || 'Chat';
     navigation.setOptions({ title: name });
   }, [conversation, user, navigation]);
-
-  // ── Mark as read on mount ───────────────────────────────────────────────────
 
   useEffect(() => {
     if (id) {
@@ -157,8 +167,6 @@ export default function ChatScreen() {
     }
   }, [id, queryClient]);
 
-  // ── Real-time socket subscription ───────────────────────────────────────────
-
   useEffect(() => {
     if (!id) return;
 
@@ -166,16 +174,13 @@ export default function ChatScreen() {
 
     const unsubscribe = on<NewMessagePayload>('new_message', (payload) => {
       if (!payload.message) return;
-      // Only add if it belongs to this conversation
       if (payload.message.conversation_id !== id) return;
 
       setMessages((prev) => {
-        // Deduplicate by id
         if (prev.some((m) => m.id === payload.message.id)) return prev;
         return [...prev, payload.message];
       });
 
-      // Mark as read immediately since screen is open
       messagingAPI.markAsRead(id).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     });
@@ -186,19 +191,14 @@ export default function ChatScreen() {
     };
   }, [id, joinConversation, leaveConversation, on, queryClient]);
 
-  // ── Auto-scroll to bottom on new messages ──────────────────────────────────
-
   useEffect(() => {
     if (messages.length > 0) {
-      // Small delay to allow FlatList to render
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: hasScrolledToBottom.current });
         hasScrolledToBottom.current = true;
       }, 100);
     }
   }, [messages]);
-
-  // ── Send message ────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(async () => {
     const body = draft.trim();
@@ -209,20 +209,17 @@ export default function ChatScreen() {
 
     try {
       const result = await messagingAPI.sendMessage(id, body);
-      // Append optimistically — socket will also fire for the sender
       setMessages((prev) => {
         if (prev.some((m) => m.id === result.message.id)) return prev;
         return [...prev, result.message];
       });
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to send message. Please try again.');
-      setDraft(body); // restore draft
+      setDraft(body);
     } finally {
       setSending(false);
     }
   }, [draft, sending, id]);
-
-  // ── Render ──────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -246,7 +243,6 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      {/* Message list */}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -279,13 +275,12 @@ export default function ChatScreen() {
         }
       />
 
-      {/* Input bar */}
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Type a message…"
+          placeholder="Type a message..."
           placeholderTextColor="#9CA3AF"
           multiline
           maxLength={2000}
@@ -308,8 +303,6 @@ export default function ChatScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -324,14 +317,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#EF4444',
   },
-
-  // Message list
   messageList: {
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-
-  // Date divider
   dateDivider: {
     alignItems: 'center',
     marginVertical: 12,
@@ -344,8 +333,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-
-  // Bubble rows
   bubbleRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -371,11 +358,9 @@ const styles = StyleSheet.create({
     color: '#2563EB',
   },
   avatarPlaceholder: {
-    width: 34, // 28px avatar + 6px margin
+    width: 34,
     flexShrink: 0,
   },
-
-  // Bubbles
   bubble: {
     maxWidth: '75%',
     borderRadius: 16,
@@ -405,6 +390,33 @@ const styles = StyleSheet.create({
   bubbleTextThem: {
     color: '#111827',
   },
+  voiceLabel: {
+    fontSize: 13,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  voiceButton: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  voiceButtonMe: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  voiceButtonThem: {
+    backgroundColor: '#E5E7EB',
+  },
+  voiceButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  voiceButtonTextMe: {
+    color: '#FFFFFF',
+  },
+  voiceButtonTextThem: {
+    color: '#111827',
+  },
   bubbleTime: {
     fontSize: 10,
     marginTop: 3,
@@ -416,8 +428,6 @@ const styles = StyleSheet.create({
   bubbleTimeThem: {
     color: '#9CA3AF',
   },
-
-  // System / deleted
   systemRow: {
     alignItems: 'center',
     marginVertical: 8,
@@ -433,8 +443,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginLeft: 34,
   },
-
-  // Empty state
   emptyChat: {
     flex: 1,
     paddingTop: 80,
@@ -444,8 +452,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
   },
-
-  // Input bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',

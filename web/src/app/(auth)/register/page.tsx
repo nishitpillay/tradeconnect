@@ -13,11 +13,13 @@ import { UserRole } from '@/types';
 import { socketClient } from '@/lib/socket/client';
 import clsx from 'clsx';
 
+type RegisterRole = Exclude<UserRole, 'admin'>;
+
 export default function RegisterPage() {
   const router = useRouter();
   const { setUser, setAccessToken, setAuthenticated } = useAuthStore();
 
-  const [role, setRole] = useState<UserRole | ''>('');
+  const [role, setRole] = useState<RegisterRole | ''>('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -75,7 +77,7 @@ export default function RegisterPage() {
         password,
         full_name: fullName,
         phone: normalizedPhone,
-        role: role as UserRole,
+        role: role as RegisterRole,
         business_name: role === 'provider' ? businessName : undefined,
         terms_accepted: true,
         privacy_accepted: true,

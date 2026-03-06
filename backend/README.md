@@ -1,162 +1,127 @@
 # TradeConnect Backend
 
-REST API for the TradeConnect platform — connecting customers with local trade service providers.
+REST API for TradeConnect with a dedicated BullMQ worker runtime.
 
 ## Stack
 
-- **Runtime**: Node.js + TypeScript (tsx)
-- **Framework**: Express
-- **Database**: PostgreSQL 16 with PostGIS
-- **Cache / Queues**: Redis + BullMQ
-- **Auth**: JWT (access + refresh tokens)
-- **Validation**: Zod
-- **Storage**: AWS S3 (LocalStack for local dev)
-- **Push notifications**: Firebase Admin SDK
-- **Email**: AWS SES
+- Runtime: Node.js + TypeScript
+- Framework: Express
+- Database: PostgreSQL 16 + PostGIS
+- Queue/Cache: Redis + BullMQ
+- Observability: pino, OpenTelemetry, Sentry
 
-## Prerequisites
-
-- Node.js 20+
-- PostgreSQL 16 with PostGIS extension
-- Redis 7
-
-The easiest way to run both locally is Docker:
+## Run
 
 ```bash
-docker run -d --name tc_postgres \
-  -e POSTGRES_USER=tc_user \
-  -e POSTGRES_PASSWORD=tc_dev_password \
-  -e POSTGRES_DB=tradeconnect_dev \
-  -p 5432:5432 postgis/postgis:16-3.4
-
-docker run -d --name tc_redis \
-  -p 6379:6379 redis:7-alpine
-```
-
-## Setup
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — at minimum set JWT_SECRET and DB_ENCRYPTION_KEY
-
-# 3. Run migrations
-npx tsx db/migrations/001_extensions_enums.ts
-npx tsx db/migrations/002_user_tables.ts
-npx tsx db/migrations/003_job_quote_tables.ts
-npx tsx db/migrations/004_messaging_moderation.ts
-npx tsx db/migrations/005_expand_rating_scale.ts
-
-# 4. Seed categories and admin user
-npx tsx db/seeds/run.ts
-
-# 5. (Optional) Seed test accounts
-npm run seed:test
-```
-
-## Running
-
-```bash
-# Development (watch mode)
+# API (producer)
 npm run dev
+
+# Worker (consumer)
 npm run worker:dev
 
-# Production build
+# Production build + run
 npm run build
-npm start
+npm run start
 npm run worker:start
+```
 
-# Queue integration smoke (requires DB + Redis + at least one active user)
+## Health
+
+- `GET /healthz` liveness
+- `GET /readyz` readiness (DB + Redis + pending migration check)
+- `GET /health` compatibility endpoint
+
+## Worker Split
+
+- API entrypoint: `src/app.ts`
+- Worker entrypoint: `src/worker/index.ts`
+- Processors are only in worker path:
+  - `src/worker/processors/notifications.processor.ts`
+
+Queue behavior:
+
+- Idempotent enqueue with deterministic `jobId`
+- Redis dedupe key with TTL (`NOTIFICATION_DEDUPE_TTL_SECONDS`)
+- Retries with exponential backoff
+- Dead-letter queue: `notifications-dead-letter`
+- Periodic queue metrics/log snapshots
+
+## Auth Hardening
+
+- Access token TTL is controlled by `JWT_EXPIRY` (default `15m`).
+- Refresh tokens are rotated on every refresh.
+- Reuse detection revokes the entire refresh token family for the user.
+- Refresh token metadata is persisted in Postgres:
+  - `device_id`, `issued_at`, `last_used_at`, `ip_hash`, `user_agent_hash`
+  - family lineage: `token_family_id`, `parent_token_id`, `replaced_by_token_id`
+- Web refresh uses `HttpOnly` cookie + CSRF double-submit:
+  - cookie: `csrf_token`
+  - header: `X-CSRF-Token`
+
+## Queue Smoke
+
+```bash
 npm run smoke:queue
 ```
 
-The API starts on `http://localhost:3000` (configurable via `PORT` in `.env`).
+Requires DB + Redis + at least one active user in `users`.
 
-## Health and Readiness
+## Docker Compose
 
-```
-GET /healthz
-GET /readyz
-GET /health
-```
+Root `docker-compose.yml` runs:
 
-- `/healthz` is liveness only.
-- `/readyz` validates PostgreSQL + Redis and checks pending migrations if `pgmigrations` metadata is available.
-- `/health` is kept as a compatibility endpoint.
+- `api` service (Express API)
+- `worker` service (BullMQ consumer)
+- shared `postgres` and `redis`
 
-## Observability
-
-- Structured JSON logs with `pino` (`requestId` and `correlationId` on all request logs).
-- Request context middleware propagates:
-  - `X-Request-Id`
-  - `X-Correlation-Id`
-- OpenTelemetry auto-instrumentation is enabled for Express/HTTP, PostgreSQL, and Redis.
-- BullMQ traces are added around notification enqueue and worker job processing.
-- Sentry captures backend + worker exceptions and performance traces.
-
-## API Overview
-
-| Method | Path | Role | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/auth/register` | — | Register a new user |
-| `POST` | `/api/auth/login` | — | Login, returns JWT |
-| `POST` | `/api/auth/refresh` | — | Refresh access token |
-| `POST` | `/api/jobs` | customer | Create a job (draft) |
-| `POST` | `/api/jobs/:id/publish` | customer | Publish a job |
-| `PATCH` | `/api/jobs/:id` | customer | Update a draft job |
-| `POST` | `/api/jobs/:id/cancel` | customer | Cancel a job |
-| `GET` | `/api/jobs/feed` | provider | Browse published jobs |
-| `POST` | `/api/jobs/:id/quotes` | provider | Submit a quote |
-| `POST` | `/api/jobs/:id/award` | customer | Award a quote |
-| `POST` | `/api/jobs/:id/complete` | customer | Mark job complete |
-| `GET` | `/api/profiles/me` | any | Get own profile |
-| `PATCH` | `/api/profiles/me` | any | Update own profile |
+Both `api` and `worker` read `backend/.env` and override `DATABASE_URL` and `REDIS_URL` to container hostnames.
 
 ## Project Structure
 
-```
+```text
 src/
-├── app.ts                  # Express app entry point
-├── config/                 # DB, Redis, env config
-├── controllers/            # Route handlers
-├── middleware/             # Auth, validation, rate limiting, errors
-├── repositories/           # SQL query layer
-├── routes/                 # Express routers
-├── schemas/                # Zod validation schemas
-├── scripts/                # One-off scripts (seed, etc.)
-└── services/               # Business logic
+  app.ts
+  config/
+  controllers/
+  middleware/
+  observability/
+  queues/
+  repositories/
+  routes/
+  schemas/
+  scripts/
+  services/
+  worker/
+    index.ts
+    processors/
 db/
-├── migrations/             # Schema migrations (run in order)
-└── seeds/                  # Reference data and test accounts
+  migrations/
+  seeds/
 ```
 
-## Test Accounts
+## Deployment Notes
 
-After running `npm run seed:test`:
+- Build once, run two runtimes:
+  - API: `npm run start`
+  - Worker: `npm run worker:start`
+- Run migrations before deploying API/worker.
+- Scale worker replicas independently from API replicas.
+- If OTLP is not available, set `OTEL_ENABLED=false`.
 
-| Email | Password | Role |
-|-------|----------|------|
-| `alice@test.com` | `TradeTest1@` | customer |
-| `bob@plumbing.com` | `TradeTest1@` | provider |
+## Important Env Vars
 
-## Environment Variables
-
-See [`.env.example`](.env.example) for the full list with descriptions.
-
-Key variables:
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `JWT_SECRET` | Secret for signing JWTs (min 64 chars) |
-| `DB_ENCRYPTION_KEY` | Key for encrypting job addresses (min 32 chars) |
-| `SENTRY_DSN` | Sentry DSN (optional) |
-| `SENTRY_TRACES_SAMPLE_RATE` | Sentry tracing sample rate (0-1) |
-| `OTEL_ENABLED` | Enable OpenTelemetry |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint (e.g. `http://localhost:4318`) |
-| `WORKER_CONCURRENCY` | BullMQ worker concurrency |
-| `NOTIFICATIONS_USE_QUEUE` | Queue notification delivery through BullMQ worker |
+- `DATABASE_URL`
+- `DB_SSL_ENABLED` (set `false` for local non-SSL Postgres)
+- `JWT_EXPIRY` (access token TTL, default `15m`)
+- `REFRESH_TOKEN_EXPIRY` (refresh token TTL, default `30d`)
+- `REDIS_URL`
+- `NOTIFICATIONS_USE_QUEUE`
+- `WORKER_CONCURRENCY`
+- `WORKER_METRICS_INTERVAL_MS`
+- `WORKER_DLQ_ENABLED`
+- `NOTIFICATION_MAX_ATTEMPTS`
+- `NOTIFICATION_BACKOFF_MS`
+- `NOTIFICATION_DEDUPE_TTL_SECONDS`
+- `SENTRY_DSN`
+- `OTEL_ENABLED`
+- `OTEL_EXPORTER_OTLP_ENDPOINT`

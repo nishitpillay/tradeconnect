@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as authCtrl from '../controllers/auth.controller';
 import { validate } from '../middleware/validate.middleware';
 import { requireAuth, requireActive } from '../middleware/auth.middleware';
+import { requireRefreshCsrf } from '../middleware/csrf.middleware';
 import {
   loginIpLimit,
   registerIpLimit,
@@ -42,6 +43,7 @@ router.post(
 
 router.post(
   '/refresh',
+  requireRefreshCsrf,
   authCtrl.refresh
 );
 

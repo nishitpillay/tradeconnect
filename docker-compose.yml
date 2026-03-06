@@ -1,6 +1,46 @@
-version: '3.9'
-
 services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tc_api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://tc_user:tc_dev_password@postgres:5432/tradeconnect_dev
+      DB_SSL_ENABLED: "false"
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    command: npm run start
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tc_worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://tc_user:tc_dev_password@postgres:5432/tradeconnect_dev
+      DB_SSL_ENABLED: "false"
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run worker:start
+
   postgres:
     image: postgis/postgis:16-3.4
     container_name: tc_postgres

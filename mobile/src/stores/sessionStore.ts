@@ -3,7 +3,7 @@ import type { User, CustomerProfile, ProviderProfile } from '../types';
 
 interface SessionState {
   user: User | null;
-  role: 'customer' | 'provider' | null;
+  role: 'customer' | 'provider' | 'admin' | null;
   customerProfile: CustomerProfile | null;
   providerProfile: ProviderProfile | null;
 
@@ -20,7 +20,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   providerProfile: null,
 
   setUser: (user) => {
-    set({ user, role: user.role as 'customer' | 'provider' });
+    set({ user, role: user.role });
   },
 
   setCustomerProfile: (profile) => {

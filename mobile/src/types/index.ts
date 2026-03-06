@@ -6,7 +6,7 @@ export type PropertyType = 'house' | 'apartment' | 'townhouse' | 'commercial' | 
 export type AUState = 'NSW' | 'VIC' | 'QLD' | 'WA' | 'SA' | 'TAS' | 'ACT' | 'NT';
 export type QuoteStatus = 'pending' | 'viewed' | 'shortlisted' | 'awarded' | 'rejected' | 'withdrawn' | 'expired';
 export type QuoteType = 'fixed' | 'estimate_range' | 'hourly' | 'call_for_quote';
-export type MessageType = 'text' | 'image' | 'system' | 'quote_event';
+export type MessageType = 'text' | 'voice' | 'image' | 'system' | 'quote_event';
 export type NotificationType = 'quote_received' | 'quote_viewed' | 'quote_shortlisted' | 'quote_awarded' | 'quote_rejected' | 'job_posted' | 'job_awarded' | 'job_completed' | 'new_message' | 'review_received';
 
 // ===== AUTH =====
@@ -207,7 +207,8 @@ export interface CategoryProvider {
 
 export interface Conversation {
   id: string;
-  job_id: string;
+  job_id: string | null;
+  conversation_type?: 'job' | 'admin_support';
   customer_id: string;
   provider_id: string;
   quote_id: string | null;

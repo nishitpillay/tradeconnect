@@ -44,6 +44,19 @@ export function errorHandler(
   }
 
   const pgError = err as { code?: string; detail?: string };
+  const statusError = err as { statusCode?: number };
+
+  if (typeof statusError.statusCode === 'number' && statusError.statusCode >= 400 && statusError.statusCode < 600) {
+    res.status(statusError.statusCode).json({
+      error: {
+        code: statusError.statusCode === 401 ? 'UNAUTHORIZED' : 'REQUEST_ERROR',
+        message: err.message,
+        ...(requestId && { request_id: requestId }),
+      },
+    });
+    return;
+  }
+
   if (pgError.code === '23505') {
     res.status(409).json({
       error: {

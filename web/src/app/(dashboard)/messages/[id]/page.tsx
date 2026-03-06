@@ -100,6 +100,19 @@ export default function ConversationPage() {
   const otherUser =
     user?.id === conversation?.customer_id ? conversation?.provider : conversation?.customer;
 
+  const renderMessageContent = (msg: Message, isOwn: boolean) => {
+    if (msg.message_type === 'voice' && msg.attachment_url) {
+      return (
+        <div className="space-y-2">
+          <p className={`text-xs ${isOwn ? 'text-primary-200' : 'text-gray-500'}`}>Voice recording</p>
+          <audio controls src={msg.attachment_url} className="w-full max-w-xs" preload="none" />
+          {msg.body ? <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p> : null}
+        </div>
+      );
+    }
+    return <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>;
+  };
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
@@ -140,7 +153,7 @@ export default function ConversationPage() {
                   {msg.is_deleted ? (
                     <span className="italic text-sm opacity-60">Message deleted</span>
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                    renderMessageContent(msg, isOwn)
                   )}
                   <p className={`text-xs mt-1 ${isOwn ? 'text-primary-200' : 'text-gray-400'}`}>
                     {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}

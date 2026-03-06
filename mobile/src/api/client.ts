@@ -1,9 +1,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
+import { useSocketStore } from '../stores/socketStore';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
 const MOCK_MODE = process.env.EXPO_PUBLIC_MOCK_MODE === 'true';
+const DEVICE_ID = `mobile-${Math.random().toString(36).slice(2, 14)}`;
 
 class APIClient {
   private client: AxiosInstance;
@@ -27,6 +29,8 @@ class APIClient {
     this.client.interceptors.request.use(
       (config) => {
         const { accessToken } = useAuthStore.getState();
+        config.headers['X-Client-Type'] = 'mobile';
+        config.headers['X-Device-Id'] = DEVICE_ID;
         if (accessToken) {
           config.headers.Authorization = `Bearer ${accessToken}`;
         }
@@ -74,6 +78,7 @@ class APIClient {
             } else {
               useAuthStore.getState().setAccessToken(access_token);
             }
+            useSocketStore.getState().updateAccessToken(access_token);
 
             // Retry all queued requests
             this.refreshSubscribers.forEach((callback) => callback(access_token));

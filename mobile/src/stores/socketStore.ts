@@ -19,8 +19,10 @@ interface SocketState {
   socket: Socket | null;
   isConnected: boolean;
   isReconnecting: boolean;
+  accessToken: string | null;
 
   connect: (accessToken: string) => void;
+  updateAccessToken: (accessToken: string) => void;
   disconnect: () => void;
 
   /** Emit any event to the server (best-effort — no-op if disconnected). */
@@ -46,15 +48,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
   isConnected: false,
   isReconnecting: false,
+  accessToken: null,
 
   connect: (accessToken) => {
+    set({ accessToken });
     // Don't create a second socket if already connected
     const existing = get().socket;
     if (existing?.connected) return;
     if (existing) existing.disconnect();
 
     const socket = io(SOCKET_URL, {
-      auth: { token: accessToken },
+      auth: (cb) => cb({ token: get().accessToken ?? accessToken }),
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -85,6 +89,16 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     set({ socket });
+  },
+
+  updateAccessToken: (accessToken) => {
+    const { socket } = get();
+    set({ accessToken });
+    if (!socket) return;
+    socket.auth = { token: accessToken };
+    if (socket.connected) {
+      socket.emit('auth:refresh', accessToken);
+    }
   },
 
   disconnect: () => {

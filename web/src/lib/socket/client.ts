@@ -8,6 +8,8 @@ export interface NewMessagePayload {
     sender_id: string;
     body: string | null;
     message_type: string;
+    attachment_url: string | null;
+    attachment_mime: string | null;
     is_deleted: boolean;
     read_by_recipient_at: string | null;
     created_at: string;
@@ -22,8 +24,10 @@ export interface MessageDeletedPayload {
 class SocketClient {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
+  private accessToken: string | null = null;
 
   connect(accessToken: string) {
+    this.accessToken = accessToken;
     if (this.socket?.connected) return;
     if (this.socket) this.socket.disconnect();
 
@@ -31,7 +35,7 @@ class SocketClient {
       process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
 
     this.socket = io(baseURL, {
-      auth: { token: accessToken },
+      auth: (cb) => cb({ token: this.accessToken }),
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -50,6 +54,15 @@ class SocketClient {
     this.socket.on('message_deleted', (payload: MessageDeletedPayload) => {
       this._dispatch('message_deleted', payload);
     });
+  }
+
+  updateAccessToken(accessToken: string) {
+    this.accessToken = accessToken;
+    if (!this.socket) return;
+    this.socket.auth = { token: accessToken };
+    if (this.socket.connected) {
+      this.socket.emit('auth:refresh', accessToken);
+    }
   }
 
   disconnect() {

@@ -15,7 +15,14 @@ export const logger = pino({
   },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
-    paths: ['req.headers.authorization', '*.password', '*.token', '*.refresh_token'],
+    paths: [
+      'req.headers.authorization',
+      'req.headers.x-csrf-token',
+      '*.password',
+      '*.token',
+      '*.refresh_token',
+      '*.csrf_token',
+    ],
     remove: true,
   },
   ...(isProd ? {} : {

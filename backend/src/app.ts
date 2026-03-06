@@ -25,6 +25,8 @@ import disputesRoutes from './routes/disputes.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import verificationsRoutes from './routes/verifications.routes';
 import adminRoutes from './routes/admin.routes';
+import { verifyAccessToken, isUserTokensInvalidated } from './services/jwt.service';
+import * as userRepo from './repositories/user.repo';
 
 initSentry('tradeconnect-backend-api');
 
@@ -48,7 +50,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-Correlation-Id'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Request-Id',
+    'X-Correlation-Id',
+    'X-CSRF-Token',
+    'X-Device-Id',
+  ],
   exposedHeaders: ['X-Request-Id', 'X-Correlation-Id', 'Retry-After'],
 }));
 
@@ -107,14 +116,22 @@ const io = new SocketIOServer(server, {
 
 setIo(io);
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined;
   if (!token) return next(new Error('Authentication required'));
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { verifyAccessToken } = require('./services/jwt.service');
     const payload = verifyAccessToken(token);
+    const invalidated = await isUserTokensInvalidated(payload.userId, payload.iat);
+    if (invalidated) {
+      return next(new Error('Token invalidated'));
+    }
+
+    const user = await userRepo.findById(payload.userId);
+    if (!user || user.status === 'suspended' || user.status === 'deleted') {
+      return next(new Error('User unavailable'));
+    }
+
     socket.data.user = payload;
     next();
   } catch {
@@ -130,6 +147,17 @@ io.on('connection', (socket) => {
   }
 
   socket.join(`user:${userId}`);
+  socket.on('auth:refresh', async (token: string, ack?: (ok: boolean) => void) => {
+    try {
+      const payload = verifyAccessToken(token);
+      const invalidated = await isUserTokensInvalidated(payload.userId, payload.iat);
+      if (invalidated) throw new Error('Token invalidated');
+      socket.data.user = payload;
+      ack?.(true);
+    } catch {
+      ack?.(false);
+    }
+  });
   socket.on('join_conversation', (conversationId: string) => socket.join(`conversation:${conversationId}`));
   socket.on('leave_conversation', (conversationId: string) => socket.leave(`conversation:${conversationId}`));
 });

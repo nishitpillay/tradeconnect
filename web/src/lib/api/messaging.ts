@@ -1,6 +1,10 @@
 import { apiClient } from './client';
 import type { Conversation, Message } from '@/types';
 
+export type SendMessagePayload =
+  | { body: string; message_type?: 'text' }
+  | { message_type: 'voice'; attachment_url: string; attachment_mime: string; body?: string };
+
 export const messagingAPI = {
   async getConversations(): Promise<Conversation[]> {
     const res = await apiClient.get<{ conversations: Conversation[] }>('/conversations');
@@ -23,10 +27,14 @@ export const messagingAPI = {
     return res.messages;
   },
 
-  async sendMessage(conversationId: string, body: string): Promise<Message> {
+  async sendMessage(conversationId: string, payload: string | SendMessagePayload): Promise<Message> {
+    const body =
+      typeof payload === 'string'
+        ? { body: payload }
+        : payload;
     const res = await apiClient.post<{ message: Message }>(
       `/conversations/${conversationId}/messages`,
-      { body }
+      body
     );
     return res.message;
   },
@@ -40,6 +48,11 @@ export const messagingAPI = {
       job_id: jobId,
       customer_id: customerId,
     });
+    return res.conversation;
+  },
+
+  async openAdminSupportConversation(): Promise<Conversation> {
+    const res = await apiClient.post<{ conversation: Conversation }>('/conversations/admin-support', {});
     return res.conversation;
   },
 };
