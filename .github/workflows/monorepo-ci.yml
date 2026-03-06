@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  shared-backend-web:
+  monorepo:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -18,71 +18,42 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: |
-            backend/package-lock.json
-            web/package-lock.json
-            mobile/package-lock.json
-            packages/shared/package-lock.json
+          cache: pnpm
 
-      - name: Install shared dependencies
-        working-directory: packages/shared
-        run: npm ci
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
+      - name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
 
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
+      - name: Build workspace
+        run: pnpm build
 
-      - name: Build backend
-        run: npm run backend:build
+      - name: Typecheck workspace
+        run: pnpm typecheck
+
+      - name: Lint workspace
+        run: pnpm lint
 
       - name: Generate OpenAPI contract
-        run: npm --prefix backend run openapi:generate
+        run: pnpm backend:openapi:generate
 
       - name: Enforce OpenAPI drift policy
-        run: npm --prefix backend run openapi:check-drift
+        run: pnpm backend:openapi:check
 
-      - name: Test backend
-        run: npm run backend:test
-
-      - name: Build web
-        run: npm run web:build
-
-  mobile:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: |
-            mobile/package-lock.json
-            packages/shared/package-lock.json
-
-      - name: Install shared dependencies
-        working-directory: packages/shared
-        run: npm ci
-
-      - name: Install mobile dependencies
-        working-directory: mobile
-        run: npm ci
-
-      - name: Build shared package
-        run: npm run shared:build
-
-      - name: Type-check mobile
-        run: npm run mobile:type-check
+      - name: Test workspace
+        run: pnpm test

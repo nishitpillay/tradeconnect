@@ -56,21 +56,34 @@ Detailed stack and architecture documentation is available in:
 
 This repo is now the TradeConnect monorepo root and tracks the cross-app workspace commands.
 
-- `npm run dev:all`
-  Starts the backend stack, web app, and Expo from this repo.
-- `npm run smoke:all`
-  Runs backend and web smoke checks, isolated web production verification, and the mobile Android smoke test.
-- `npm run shared:build`
-- `npm run backend:build`
-- `npm run backend:openapi:generate`
-- `npm run backend:openapi:check`
-- `npm run backend:test`
-- `npm run web:type-check`
-- `npm run web:build`
-- `npm run web:verify`
-- `npm run mobile:type-check`
+- Use `pnpm` from repo root with Turborepo task orchestration.
 
-`npm run web:verify` uses a dedicated Next build output (`.next-verify`) and port `3002`, so production-style verification does not interfere with the dev server on port `3001`.
+- `pnpm dev`
+  Runs workspace `dev` scripts in parallel via Turbo.
+- `pnpm build`
+  Runs cached builds across shared/backend/web/mobile.
+- `pnpm typecheck`
+  Runs cached type-check tasks across workspaces.
+- `pnpm test`
+  Runs workspace tests (backend tests + no-op placeholders where tests are not configured).
+- `pnpm lint`
+  Runs workspace lint scripts.
+
+- `pnpm run dev:all`
+  Starts the backend stack, web app, and Expo from this repo.
+- `pnpm run smoke:all`
+  Runs backend and web smoke checks, isolated web production verification, and the mobile Android smoke test.
+- `pnpm run shared:build`
+- `pnpm run backend:build`
+- `pnpm run backend:openapi:generate`
+- `pnpm run backend:openapi:check`
+- `pnpm run backend:test`
+- `pnpm run web:type-check`
+- `pnpm run web:build`
+- `pnpm run web:verify`
+- `pnpm run mobile:type-check`
+
+`pnpm run web:verify` uses a dedicated Next build output (`.next-verify`) and port `3002`, so production-style verification does not interfere with the dev server on port `3001`.
 
 ## Current Product Areas
 

@@ -114,11 +114,11 @@ export default function DashboardPage() {
             </div>
           ) : (
             <Card padding="lg">
-              <div className="text-center py-12">
-                <p className="text-gray-600 mb-4">You haven't posted any jobs yet</p>
-                <Link href="/jobs/new">
-                  <Button>Post Your First Job</Button>
-                </Link>
+                <div className="text-center py-12">
+                  <p className="text-gray-600 mb-4">You haven&apos;t posted any jobs yet</p>
+                  <Link href="/jobs/new">
+                    <Button>Post Your First Job</Button>
+                  </Link>
               </div>
             </Card>
           )}

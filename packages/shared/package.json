@@ -2,21 +2,26 @@
   "name": "@tradeconnect/shared",
   "version": "1.0.0",
   "main": "./dist/index.js",
+  "react-native": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "react-native": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./schemas/auth.schema": {
+      "react-native": "./src/schemas/auth.schema.ts",
       "types": "./dist/schemas/auth.schema.d.ts",
       "default": "./dist/schemas/auth.schema.js"
     },
     "./schemas/job.schema": {
+      "react-native": "./src/schemas/job.schema.ts",
       "types": "./dist/schemas/job.schema.d.ts",
       "default": "./dist/schemas/job.schema.js"
     },
     "./schemas/quote.schema": {
+      "react-native": "./src/schemas/quote.schema.ts",
       "types": "./dist/schemas/quote.schema.d.ts",
       "default": "./dist/schemas/quote.schema.js"
     }
@@ -25,8 +30,12 @@
     "dist"
   ],
   "scripts": {
+    "dev": "tsc -w -p tsconfig.json",
     "build": "tsc -p tsconfig.json",
-    "type-check": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "type-check": "npm run typecheck",
+    "test": "node -e \"console.log('shared tests not configured')\"",
+    "lint": "node -e \"console.log('shared lint not configured yet')\""
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",

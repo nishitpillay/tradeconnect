@@ -10,6 +10,7 @@ build/
 .next-verify/
 out/
 coverage/
+.turbo/
 
 # Environment files
 .env

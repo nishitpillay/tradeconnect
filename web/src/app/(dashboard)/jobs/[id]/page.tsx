@@ -372,7 +372,7 @@ export default function JobDetailPage() {
   if (jobError || !job) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500 mb-4">Job not found or you don't have access.</p>
+        <p className="text-gray-500 mb-4">Job not found or you don&apos;t have access.</p>
         <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
       </div>
     );

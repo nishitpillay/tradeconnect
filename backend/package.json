@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/app.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "node -e \"console.log('backend lint not configured yet')\"",
     "worker:dev": "tsx watch src/worker/index.ts",
     "migrate:dev": "tsx --env-file=.env src/scripts/migrate.ts latest",
     "migrate:deploy": "tsx --env-file=.env src/scripts/migrate.ts latest",
