@@ -1,23 +1,34 @@
-FROM node:20-alpine AS builder
-WORKDIR /app
+FROM node:20-alpine AS base
+WORKDIR /repo
+RUN corepack enable
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY backend/package.json backend/package.json
+COPY packages/shared/package.json packages/shared/package.json
 
-COPY tsconfig.json ./
-COPY src ./src
-COPY db ./db
-RUN npm run build
+RUN pnpm install --filter @tradeconnect/backend... --frozen-lockfile
+
+FROM base AS builder
+COPY backend backend
+COPY packages/shared packages/shared
+
+RUN pnpm --filter @tradeconnect/shared build
+RUN pnpm --filter @tradeconnect/backend build
 
 FROM node:20-alpine AS runtime
-WORKDIR /app
+WORKDIR /repo
 ENV NODE_ENV=production
+RUN corepack enable
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY backend/package.json backend/package.json
+COPY packages/shared/package.json packages/shared/package.json
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/db ./db
+RUN pnpm install --filter @tradeconnect/backend --prod --frozen-lockfile
 
+COPY --from=builder /repo/backend/dist backend/dist
+COPY --from=builder /repo/backend/db backend/db
+
+WORKDIR /repo/backend
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["pnpm", "start"]

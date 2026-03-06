@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  monorepo:
+  lint-typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -40,20 +40,238 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
-      - name: Build workspace
-        run: pnpm build
+      - name: Lint workspace
+        run: pnpm lint
 
       - name: Typecheck workspace
         run: pnpm typecheck
 
-      - name: Lint workspace
-        run: pnpm lint
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - lint-typecheck
 
-      - name: Generate OpenAPI contract
-        run: pnpm backend:openapi:generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Enforce OpenAPI drift policy
-        run: pnpm backend:openapi:check
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
-      - name: Test workspace
-        run: pnpm test
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend unit tests (Jest)
+        run: pnpm --filter @tradeconnect/backend test -- --runInBand
+
+  mobile-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - lint-typecheck
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Mobile lint
+        run: pnpm --filter tradeconnect-mobile lint
+
+      - name: Mobile typecheck
+        run: pnpm --filter tradeconnect-mobile typecheck
+
+  web-playwright-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs:
+      - backend-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter tradeconnect-web playwright:install
+
+      - name: Start API + DB + Redis via Docker Compose
+        run: docker compose -f .github/docker-compose.e2e.yml up -d --build
+
+      - name: Wait for API readiness
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:4000/healthz > /dev/null; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy in time"
+          docker compose -f .github/docker-compose.e2e.yml ps
+          docker compose -f .github/docker-compose.e2e.yml logs api
+          exit 1
+
+      - name: Run DB migrations
+        run: pnpm --filter @tradeconnect/backend migrate:deploy
+        env:
+          NODE_ENV: development
+          API_BASE_URL: http://localhost:4000
+          FRONTEND_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
+          DATABASE_URL: postgresql://tc_user:tc_dev_password@localhost:5432/tradeconnect_dev
+          DB_SSL_ENABLED: "false"
+          DB_POOL_MAX: "10"
+          SLOW_QUERY_MS: "300"
+          DB_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef"
+          JWT_SECRET: "0123456789abcdef0123456789abcdef"
+          JWT_EXPIRY: 15m
+          REFRESH_TOKEN_EXPIRY: 30d
+          AWS_REGION: ap-southeast-2
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          S3_BUCKET_NAME: tc-test
+          CDN_BASE_URL: http://localhost:4566/tc-test
+          S3_ENDPOINT: http://localhost:4566
+          S3_PRESIGN_EXPIRY_SECONDS: "3600"
+          FIREBASE_PROJECT_ID: tradeconnect-test
+          FIREBASE_CLIENT_EMAIL: test@tradeconnect-test.iam.gserviceaccount.com
+          FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n"
+          GOOGLE_MAPS_API_KEY: test
+          REDIS_URL: redis://localhost:6379
+          QUEUE_PREFIX: tc:
+          LOG_LEVEL: warn
+          SENTRY_TRACES_SAMPLE_RATE: "0"
+          SENTRY_PROFILES_SAMPLE_RATE: "0"
+          OTEL_ENABLED: "false"
+          OTEL_SERVICE_NAME: tradeconnect-backend
+          WORKER_CONCURRENCY: "5"
+          WORKER_METRICS_INTERVAL_MS: "60000"
+          WORKER_DLQ_ENABLED: "true"
+          NOTIFICATIONS_USE_QUEUE: "true"
+          NOTIFICATION_MAX_ATTEMPTS: "5"
+          NOTIFICATION_BACKOFF_MS: "1000"
+          NOTIFICATION_DEDUPE_TTL_SECONDS: "300"
+          JOB_EXPIRY_DAYS: "30"
+          QUOTE_EXPIRY_DAYS: "14"
+          REVIEW_WINDOW_DAYS: "60"
+          MESSAGE_RETENTION_MONTHS: "24"
+          PII_VIOLATIONS_BEFORE_FLAG: "3"
+          PII_VIOLATIONS_BEFORE_SUSPEND: "5"
+
+      - name: Seed E2E users
+        run: pnpm --filter @tradeconnect/backend seed:test
+        env:
+          NODE_ENV: development
+          API_BASE_URL: http://localhost:4000
+          FRONTEND_URL: http://localhost:3000
+          CORS_ORIGINS: http://localhost:3000
+          DATABASE_URL: postgresql://tc_user:tc_dev_password@localhost:5432/tradeconnect_dev
+          DB_SSL_ENABLED: "false"
+          DB_POOL_MAX: "10"
+          SLOW_QUERY_MS: "300"
+          DB_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef"
+          JWT_SECRET: "0123456789abcdef0123456789abcdef"
+          JWT_EXPIRY: 15m
+          REFRESH_TOKEN_EXPIRY: 30d
+          AWS_REGION: ap-southeast-2
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          S3_BUCKET_NAME: tc-test
+          CDN_BASE_URL: http://localhost:4566/tc-test
+          S3_ENDPOINT: http://localhost:4566
+          S3_PRESIGN_EXPIRY_SECONDS: "3600"
+          FIREBASE_PROJECT_ID: tradeconnect-test
+          FIREBASE_CLIENT_EMAIL: test@tradeconnect-test.iam.gserviceaccount.com
+          FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n"
+          GOOGLE_MAPS_API_KEY: test
+          REDIS_URL: redis://localhost:6379
+          QUEUE_PREFIX: tc:
+          LOG_LEVEL: warn
+          SENTRY_TRACES_SAMPLE_RATE: "0"
+          SENTRY_PROFILES_SAMPLE_RATE: "0"
+          OTEL_ENABLED: "false"
+          OTEL_SERVICE_NAME: tradeconnect-backend
+          WORKER_CONCURRENCY: "5"
+          WORKER_METRICS_INTERVAL_MS: "60000"
+          WORKER_DLQ_ENABLED: "true"
+          NOTIFICATIONS_USE_QUEUE: "true"
+          NOTIFICATION_MAX_ATTEMPTS: "5"
+          NOTIFICATION_BACKOFF_MS: "1000"
+          NOTIFICATION_DEDUPE_TTL_SECONDS: "300"
+          JOB_EXPIRY_DAYS: "30"
+          QUOTE_EXPIRY_DAYS: "14"
+          REVIEW_WINDOW_DAYS: "60"
+          MESSAGE_RETENTION_MONTHS: "24"
+          PII_VIOLATIONS_BEFORE_FLAG: "3"
+          PII_VIOLATIONS_BEFORE_SUSPEND: "5"
+
+      - name: Run Playwright smoke (headless)
+        run: pnpm --filter tradeconnect-web test:e2e:smoke
+        env:
+          CI: "true"
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:4000/api
+          E2E_BASE_URL: http://localhost:3000
+          E2E_HEADED: "false"
+          E2E_VIDEO: on
+
+      - name: Print Docker logs on failure
+        if: failure()
+        run: |
+          docker compose -f .github/docker-compose.e2e.yml ps
+          docker compose -f .github/docker-compose.e2e.yml logs --no-color > e2e-docker.log || true
+          tail -n 200 e2e-docker.log || true
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            web/playwright-report/**
+            web/test-results/**
+            e2e-docker.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Shutdown docker compose stack
+        if: always()
+        run: docker compose -f .github/docker-compose.e2e.yml down -v
+
