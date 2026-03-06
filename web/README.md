@@ -76,6 +76,8 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
+`npm run dev`, `npm run build`, and `npm run start` run strict env validation first and fail fast with clear errors when configuration is invalid.
+
 ### Access the App
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -347,11 +349,22 @@ import clsx from 'clsx';
 # .env.local (development)
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 
-# .env.production (production)
+# .env.production (production/staging)
 NEXT_PUBLIC_API_BASE_URL=https://api.tradeconnect.com/api
 ```
 
 **Important:** All variables exposed to the browser must start with `NEXT_PUBLIC_`
+
+### Required by environment
+
+- Development:
+  - `NEXT_PUBLIC_API_BASE_URL`
+- Staging:
+  - `NEXT_PUBLIC_API_BASE_URL`
+- Production:
+  - `NEXT_PUBLIC_API_BASE_URL`
+
+Use `web/.env.example` or `web/.env.local.example` as templates. Do not put real secrets in these files.
 
 ---
 

@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequ
 import { useAuthStore } from '../store/authStore';
 import { APIError } from '@/types';
 import { socketClient } from '../socket/client';
+import { webEnv } from '@/config/env';
 
 type APIRequestConfig = AxiosRequestConfig & {
   _retry?: boolean;
@@ -13,9 +14,8 @@ class APIClient {
   private refreshTokenPromise: Promise<string> | null = null;
 
   constructor() {
-    console.log("[API Client] Base URL:", process.env.NEXT_PUBLIC_API_BASE_URL);
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+      baseURL: webEnv.NEXT_PUBLIC_API_BASE_URL,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -87,7 +87,7 @@ class APIClient {
       try {
         const csrfToken = readCookie('csrf_token');
         const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
+          `${webEnv.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
           {},
           {
             withCredentials: true, // Send refresh token cookie

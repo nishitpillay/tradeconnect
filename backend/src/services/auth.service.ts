@@ -11,6 +11,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { db } from '../config/database';
 import { redis } from '../config/redis';
+import { env } from '../config/env';
 import * as userRepo from '../repositories/user.repo';
 import {
   signAccessToken,
@@ -97,7 +98,7 @@ export async function register(input: RegisterInput): Promise<{
   });
 
   // In development, auto-verify email so users can post jobs immediately
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = env.NODE_ENV === 'development';
   if (isDev) {
     await db.query('UPDATE users SET email_verified = TRUE WHERE id = $1', [user.id]);
     user.email_verified = true;
@@ -237,7 +238,7 @@ export async function sendEmailVerification(userId: string, _email: string): Pro
     [userId, hash, expiresAt]
   );
 
-  const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${raw}`;
+  const verifyUrl = `${env.FRONTEND_URL}/verify-email?token=${raw}`;
 
   notify({
     userId,
@@ -346,7 +347,7 @@ export async function forgotPassword(email: string): Promise<void> {
     [user.id, hash, expiresAt]
   );
 
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${raw}`;
+  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${raw}`;
 
   notify({
     userId: user.id,

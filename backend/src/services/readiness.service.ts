@@ -18,31 +18,69 @@ export interface ReadinessResult {
 }
 
 async function checkMigrations(): Promise<ReadinessResult['checks']['migrations']> {
-  const migrationsDir = path.resolve(process.cwd(), 'db', 'migrations');
-  let files: string[];
+  const legacyDir = path.resolve(process.cwd(), 'db', 'migrations');
+  const knexDir = path.resolve(process.cwd(), 'db', 'knex', 'migrations');
 
-  try {
-    files = (await fs.readdir(migrationsDir))
-      .filter((name) => /^\d+.*\.(ts|js)$/.test(name))
-      .sort();
-  } catch {
+  const [legacyFiles, knexFiles] = await Promise.all([
+    readMigrationFiles(legacyDir, /^\d+.*\.(ts|js)$/),
+    readMigrationFiles(knexDir, /^\d{14}.*\.js$/),
+  ]);
+
+  if (legacyFiles.length === 0 && knexFiles.length === 0) {
     return { available: false, ok: true, pendingCount: 0 };
   }
 
-  try {
-    const { rows } = await db.query<{ name: string }>('SELECT name FROM pgmigrations');
-    const applied = new Set(rows.map((r) => r.name.replace(/\.(ts|js)$/i, '')));
-    const pending = files.filter((file) => !applied.has(file.replace(/\.(ts|js)$/i, '')));
+  const pending: string[] = [];
 
-    return {
-      available: true,
-      ok: pending.length === 0,
-      pendingCount: pending.length,
-      pending: pending.length > 0 ? pending : undefined,
-    };
-  } catch {
-    return { available: false, ok: true, pendingCount: 0 };
+  if (legacyFiles.length > 0) {
+    const appliedLegacy = await readAppliedMigrations('pgmigrations', 'name');
+    pending.push(
+      ...legacyFiles.filter((file) => !appliedLegacy.has(stripExt(file))).map((name) => `legacy:${name}`)
+    );
   }
+
+  if (knexFiles.length > 0) {
+    const appliedKnex = await readAppliedMigrations('knex_migrations', 'name');
+    pending.push(
+      ...knexFiles.filter((file) => !appliedKnex.has(file)).map((name) => `knex:${name}`)
+    );
+  }
+
+  return {
+    available: true,
+    ok: pending.length === 0,
+    pendingCount: pending.length,
+    pending: pending.length > 0 ? pending : undefined,
+  };
+}
+
+async function readMigrationFiles(
+  directory: string,
+  pattern: RegExp
+): Promise<string[]> {
+  try {
+    return (await fs.readdir(directory)).filter((name) => pattern.test(name)).sort();
+  } catch {
+    return [];
+  }
+}
+
+async function readAppliedMigrations(
+  tableName: string,
+  columnName: string
+): Promise<Set<string>> {
+  try {
+    const { rows } = await db.query<{ value: string }>(
+      `SELECT ${columnName}::text AS value FROM ${tableName}`
+    );
+    return new Set(rows.map((row) => stripExt(row.value)));
+  } catch {
+    return new Set();
+  }
+}
+
+function stripExt(name: string): string {
+  return name.replace(/\.(ts|js)$/i, '');
 }
 
 export async function getReadiness(): Promise<ReadinessResult> {

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'crypto';
 import * as authService from '../services/auth.service';
 import * as userRepo from '../repositories/user.repo';
+import { env } from '../config/env';
 
 // ── Register ──────────────────────────────────────────────────────────────────
 
@@ -203,7 +204,7 @@ function sanitiseUser(user: {
 }
 
 function cookieOptions() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = env.NODE_ENV === 'production';
   return {
     httpOnly: true,
     secure: isProd,
@@ -214,7 +215,7 @@ function cookieOptions() {
 }
 
 function csrfCookieOptions() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = env.NODE_ENV === 'production';
   return {
     httpOnly: false,
     secure: isProd,
@@ -225,7 +226,7 @@ function csrfCookieOptions() {
 }
 
 function deviceCookieOptions() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = env.NODE_ENV === 'production';
   return {
     httpOnly: false,
     secure: isProd,

@@ -36,7 +36,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3001')
+const allowedOrigins = env.CORS_ORIGINS
   .split(',')
   .map((o) => o.trim());
 

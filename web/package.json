@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "env:check": "tsx scripts/validate-env.ts",
+    "dev": "npm run env:check && next dev",
+    "build": "npm run env:check && next build",
+    "start": "npm run env:check && next start",
     "verify:prod": "node scripts/verify-production.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",

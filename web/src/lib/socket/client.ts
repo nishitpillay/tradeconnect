@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { webEnv } from '@/config/env';
 
 export interface NewMessagePayload {
   conversationId?: string;
@@ -32,7 +33,7 @@ class SocketClient {
     if (this.socket) this.socket.disconnect();
 
     const baseURL =
-      process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
+      webEnv.NEXT_PUBLIC_API_BASE_URL.replace('/api', '');
 
     this.socket = io(baseURL, {
       auth: (cb) => cb({ token: this.accessToken }),

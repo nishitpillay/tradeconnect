@@ -23,12 +23,17 @@ npm run worker:dev
 npm run build
 npm run start
 npm run worker:start
+
+# Migrations
+npm run migrate:dev
+npm run migrate:deploy
+npm run migrate:status
 ```
 
 ## Health
 
 - `GET /healthz` liveness
-- `GET /readyz` readiness (DB + Redis + pending migration check)
+- `GET /readyz` readiness (DB + Redis + pending migration check across legacy + Knex)
 - `GET /health` compatibility endpoint
 
 ## Worker Split
@@ -104,7 +109,8 @@ db/
 - Build once, run two runtimes:
   - API: `npm run start`
   - Worker: `npm run worker:start`
-- Run migrations before deploying API/worker.
+- Run migrations before deploying API/worker:
+  - `npm run migrate:deploy`
 - Scale worker replicas independently from API replicas.
 - If OTLP is not available, set `OTEL_ENABLED=false`.
 
@@ -114,6 +120,8 @@ db/
 - `DB_SSL_ENABLED` (set `false` for local non-SSL Postgres)
 - `JWT_EXPIRY` (access token TTL, default `15m`)
 - `REFRESH_TOKEN_EXPIRY` (refresh token TTL, default `30d`)
+- `FRONTEND_URL`
+- `CORS_ORIGINS`
 - `REDIS_URL`
 - `NOTIFICATIONS_USE_QUEUE`
 - `WORKER_CONCURRENCY`
@@ -125,3 +133,30 @@ db/
 - `SENTRY_DSN`
 - `OTEL_ENABLED`
 - `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+## Environment Profiles
+
+Use `backend/.env.example` as the source template.
+
+- Development required:
+  - `API_BASE_URL`, `FRONTEND_URL`, `CORS_ORIGINS`
+  - `DATABASE_URL`, `DB_ENCRYPTION_KEY`
+  - `JWT_SECRET`
+  - `REDIS_URL`
+  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+  - `S3_BUCKET_NAME`, `CDN_BASE_URL`
+  - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+  - `GOOGLE_MAPS_API_KEY`
+- Staging required:
+  - all Development required vars
+  - `SENTRY_DSN` (recommended)
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` (recommended)
+  - `DB_SSL_ENABLED=true` (unless your staging DB is intentionally non-SSL)
+- Production required:
+  - all Development required vars
+  - `SENTRY_DSN`
+  - `DB_SSL_ENABLED=true` for managed Postgres with SSL
+  - strongly recommended: `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+Startup fails fast with detailed validation errors if required env vars are missing or invalid.
+No env values are logged; application logs redact known secret fields.
