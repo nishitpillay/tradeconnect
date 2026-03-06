@@ -72,6 +72,21 @@ export async function findConversationById(id: string): Promise<Conversation | n
   return rows[0] ?? null;
 }
 
+export async function isConversationParticipant(
+  conversationId: string,
+  userId: string
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `SELECT 1
+     FROM conversations
+     WHERE id = $1
+       AND (customer_id = $2 OR provider_id = $2)
+     LIMIT 1`,
+    [conversationId, userId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function findConversationByParticipants(
   jobId: string,
   customerId: string,

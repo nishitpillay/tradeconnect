@@ -11,6 +11,9 @@ services:
       DATABASE_URL: postgresql://tc_user:tc_dev_password@postgres:5432/tradeconnect_dev
       DB_SSL_ENABLED: "false"
       REDIS_URL: redis://redis:6379
+      SOCKET_IO_REDIS_ADAPTER_ENABLED: "true"
+      SOCKET_IO_MAX_HTTP_BUFFER_BYTES: "262144"
+      SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES: "8192"
       NODE_ENV: production
     depends_on:
       postgres:

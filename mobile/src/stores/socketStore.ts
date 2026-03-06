@@ -1,43 +1,41 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-import type { Message } from '../types';
 
-// ── Event payload types emitted by the backend ────────────────────────────────
+const SOCKET_EVENTS = {
+  authRefresh: 'auth.refresh',
+  joinConversation: 'conversation.join',
+  leaveConversation: 'conversation.leave',
+} as const;
 
-export interface NewMessagePayload {
-  conversationId?: string;
-  message: Message;
+const LEGACY_SOCKET_EVENTS = {
+  authRefresh: 'auth:refresh',
+} as const;
+
+export interface MessageCreatedPayload {
+  conversationId: string;
+  messageId: string;
+  messageType: string;
+  createdAt: string;
 }
 
 export interface MessageDeletedPayload {
   messageId: string;
+  conversationId?: string;
+  deletedAt?: string;
 }
-
-// ── Store interface ───────────────────────────────────────────────────────────
 
 interface SocketState {
   socket: Socket | null;
   isConnected: boolean;
   isReconnecting: boolean;
   accessToken: string | null;
-
   connect: (accessToken: string) => void;
   updateAccessToken: (accessToken: string) => void;
   disconnect: () => void;
-
-  /** Emit any event to the server (best-effort — no-op if disconnected). */
   emit: (event: string, data?: unknown) => void;
-
-  /** Subscribe to a socket event. Returns an unsubscribe function. */
   on: <T = unknown>(event: string, callback: (data: T) => void) => () => void;
-
-  /** Unsubscribe a specific callback from a socket event. */
   off: <T = unknown>(event: string, callback: (data: T) => void) => void;
-
-  /** Join a conversation room to receive real-time messages. */
   joinConversation: (conversationId: string) => void;
-
-  /** Leave a conversation room. */
   leaveConversation: (conversationId: string) => void;
 }
 
@@ -52,7 +50,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
   connect: (accessToken) => {
     set({ accessToken });
-    // Don't create a second socket if already connected
     const existing = get().socket;
     if (existing?.connected) return;
     if (existing) existing.disconnect();
@@ -97,7 +94,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     if (!socket) return;
     socket.auth = { token: accessToken };
     if (socket.connected) {
-      socket.emit('auth:refresh', accessToken);
+      socket.emit(SOCKET_EVENTS.authRefresh, accessToken);
+      socket.emit(LEGACY_SOCKET_EVENTS.authRefresh, accessToken);
     }
   },
 
@@ -113,15 +111,15 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const { socket, isConnected } = get();
     if (socket && isConnected) {
       socket.emit(event, data);
-    } else {
-      console.warn('[Socket] Cannot emit — not connected:', event);
+      return;
     }
+    console.warn('[Socket] Cannot emit - not connected:', event);
   },
 
   on: (event, callback) => {
     const { socket } = get();
     if (!socket) {
-      console.warn('[Socket] Cannot subscribe — socket not initialised:', event);
+      console.warn('[Socket] Cannot subscribe - socket not initialised:', event);
       return () => {};
     }
     socket.on(event, callback as (...args: unknown[]) => void);
@@ -138,10 +136,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   },
 
   joinConversation: (conversationId) => {
-    get().emit('join_conversation', conversationId);
+    get().emit(SOCKET_EVENTS.joinConversation, { conversationId });
   },
 
   leaveConversation: (conversationId) => {
-    get().emit('leave_conversation', conversationId);
+    get().emit(SOCKET_EVENTS.leaveConversation, { conversationId });
   },
 }));
+

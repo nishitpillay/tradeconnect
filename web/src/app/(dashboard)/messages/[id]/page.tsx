@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { messagingAPI } from '@/lib/api/messaging';
 import { useAuthStore } from '@/lib/store/authStore';
-import { socketClient, type NewMessagePayload } from '@/lib/socket/client';
+import { socketClient, type MessageCreatedPayload } from '@/lib/socket/client';
 import { Button } from '@/components/ui/Button';
 import type { Message } from '@/types';
 
@@ -52,15 +52,11 @@ export default function ConversationPage() {
     socketClient.joinConversation(id);
     messagingAPI.markAsRead(id).catch(() => {});
 
-    const unsubscribe = socketClient.on<NewMessagePayload>('new_message', (payload) => {
-      if (payload.message.conversation_id !== id) return;
-      setMessages((prev) => {
-        // Deduplicate
-        if (prev.some((m) => m.id === payload.message.id)) return prev;
-        return [...prev, payload.message as unknown as Message];
-      });
+    const unsubscribe = socketClient.on<MessageCreatedPayload>('messaging.message.created', async (payload) => {
+      if (!payload || payload.conversationId !== id) return;
+      const latestMessages = await messagingAPI.getMessages(id);
+      setMessages(latestMessages);
       setTimeout(scrollToBottom, 50);
-      // Invalidate unread count in sidebar
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     });
 

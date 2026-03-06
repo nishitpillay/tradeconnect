@@ -16,7 +16,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { messagingAPI } from '../../../src/api/messaging.api';
 import { useSessionStore } from '../../../src/stores/sessionStore';
-import { useSocketStore, type NewMessagePayload } from '../../../src/stores/socketStore';
+import { useSocketStore, type MessageCreatedPayload } from '../../../src/stores/socketStore';
 import type { Message } from '../../../src/types';
 
 function formatMessageTime(iso: string): string {
@@ -172,17 +172,16 @@ export default function ChatScreen() {
 
     joinConversation(id);
 
-    const unsubscribe = on<NewMessagePayload>('new_message', (payload) => {
-      if (!payload.message) return;
-      if (payload.message.conversation_id !== id) return;
-
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === payload.message.id)) return prev;
-        return [...prev, payload.message];
-      });
-
-      messagingAPI.markAsRead(id).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    const unsubscribe = on<MessageCreatedPayload>('messaging.message.created', async (payload) => {
+      if (!payload || payload.conversationId !== id) return;
+      try {
+        const result = await messagingAPI.getMessages(id);
+        setMessages([...result.messages].reverse());
+        messagingAPI.markAsRead(id).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      } catch {
+        // Ignore transient refresh failures and wait for next event/poll.
+      }
     });
 
     return () => {

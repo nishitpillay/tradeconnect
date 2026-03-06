@@ -1,25 +1,33 @@
 import { io, Socket } from 'socket.io-client';
 import { webEnv } from '@/config/env';
 
-export interface NewMessagePayload {
-  conversationId?: string;
-  message: {
-    id: string;
-    conversation_id: string;
-    sender_id: string;
-    body: string | null;
-    message_type: string;
-    attachment_url: string | null;
-    attachment_mime: string | null;
-    is_deleted: boolean;
-    read_by_recipient_at: string | null;
-    created_at: string;
-    sender?: { id: string; full_name: string };
-  };
+const SOCKET_EVENTS = {
+  authRefresh: 'auth.refresh',
+  joinConversation: 'conversation.join',
+  leaveConversation: 'conversation.leave',
+  messageCreated: 'messaging.message.created',
+  messageDeleted: 'messaging.message.deleted',
+} as const;
+
+const LEGACY_SOCKET_EVENTS = {
+  authRefresh: 'auth:refresh',
+  joinConversation: 'join_conversation',
+  leaveConversation: 'leave_conversation',
+  messageCreated: 'new_message',
+  messageDeleted: 'message_deleted',
+} as const;
+
+export interface MessageCreatedPayload {
+  conversationId: string;
+  messageId: string;
+  messageType: string;
+  createdAt: string;
 }
 
 export interface MessageDeletedPayload {
+  conversationId?: string;
   messageId: string;
+  deletedAt?: string;
 }
 
 class SocketClient {
@@ -48,12 +56,18 @@ class SocketClient {
     this.socket.on('connect_error', (err) => console.warn('[Socket] Error:', err.message));
 
     // Forward backend events to registered listeners
-    this.socket.on('new_message', (payload: NewMessagePayload) => {
-      this._dispatch('new_message', payload);
+    this.socket.on(SOCKET_EVENTS.messageCreated, (payload: MessageCreatedPayload) => {
+      this._dispatch(SOCKET_EVENTS.messageCreated, payload);
+    });
+    this.socket.on(LEGACY_SOCKET_EVENTS.messageCreated, (payload: MessageCreatedPayload) => {
+      this._dispatch(SOCKET_EVENTS.messageCreated, payload);
     });
 
-    this.socket.on('message_deleted', (payload: MessageDeletedPayload) => {
-      this._dispatch('message_deleted', payload);
+    this.socket.on(SOCKET_EVENTS.messageDeleted, (payload: MessageDeletedPayload) => {
+      this._dispatch(SOCKET_EVENTS.messageDeleted, payload);
+    });
+    this.socket.on(LEGACY_SOCKET_EVENTS.messageDeleted, (payload: MessageDeletedPayload) => {
+      this._dispatch(SOCKET_EVENTS.messageDeleted, payload);
     });
   }
 
@@ -62,7 +76,8 @@ class SocketClient {
     if (!this.socket) return;
     this.socket.auth = { token: accessToken };
     if (this.socket.connected) {
-      this.socket.emit('auth:refresh', accessToken);
+      this.socket.emit(SOCKET_EVENTS.authRefresh, accessToken);
+      this.socket.emit(LEGACY_SOCKET_EVENTS.authRefresh, accessToken);
     }
   }
 
@@ -77,14 +92,14 @@ class SocketClient {
   /** Join a conversation room to receive real-time messages. */
   joinConversation(conversationId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('join_conversation', conversationId);
+      this.socket.emit(SOCKET_EVENTS.joinConversation, { conversationId });
     }
   }
 
   /** Leave a conversation room. */
   leaveConversation(conversationId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('leave_conversation', conversationId);
+      this.socket.emit(SOCKET_EVENTS.leaveConversation, { conversationId });
     }
   }
 

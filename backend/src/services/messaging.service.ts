@@ -5,6 +5,12 @@ import { findPrimaryActiveAdmin } from '../repositories/user.repo';
 import { Errors } from '../middleware/errors';
 import { getIo } from '../config/socket';
 import { notify } from './notification.service';
+import {
+  conversationRoom,
+  LEGACY_SOCKET_EVENTS,
+  SOCKET_EVENTS,
+  userRoom,
+} from '../realtime/socket.events';
 
 const PII_PATTERNS = [
   /\b04\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b/,
@@ -138,8 +144,19 @@ export async function sendMessage(
 
   const io = getIo();
   if (io) {
-    io.to(`conversation:${conversationId}`).emit('new_message', { message });
-    io.to(`user:${recipientId}`).emit('new_message', { conversationId, message });
+    const eventPayload = {
+      conversationId,
+      messageId: message.id,
+      messageType: message.message_type,
+      createdAt: message.created_at.toISOString(),
+    };
+
+    io.to(conversationRoom(conversationId)).emit(SOCKET_EVENTS.messageCreated, eventPayload);
+    io.to(userRoom(recipientId)).emit(SOCKET_EVENTS.messageCreated, eventPayload);
+
+    // Temporary legacy events; remove after all clients are migrated.
+    io.to(conversationRoom(conversationId)).emit(LEGACY_SOCKET_EVENTS.messageCreated, { message });
+    io.to(userRoom(recipientId)).emit(LEGACY_SOCKET_EVENTS.messageCreated, { conversationId, message });
   }
 
   notify({
@@ -246,7 +263,13 @@ export async function deleteMessage(
 
   const io = getIo();
   if (io) {
-    io.to(`conversation:${conversationId}`).emit('message_deleted', { messageId });
+    const eventPayload = {
+      conversationId,
+      messageId,
+      deletedAt: deleted.deleted_at?.toISOString() ?? new Date().toISOString(),
+    };
+    io.to(conversationRoom(conversationId)).emit(SOCKET_EVENTS.messageDeleted, eventPayload);
+    io.to(conversationRoom(conversationId)).emit(LEGACY_SOCKET_EVENTS.messageDeleted, { messageId });
   }
 
   return deleted;

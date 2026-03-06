@@ -58,6 +58,9 @@ const envSchema = z.object({
 
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   QUEUE_PREFIX: z.string().default('tc:'),
+  SOCKET_IO_REDIS_ADAPTER_ENABLED: envBoolean(true),
+  SOCKET_IO_MAX_HTTP_BUFFER_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(256 * 1024),
+  SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES: z.coerce.number().int().min(256).max(512 * 1024).default(8 * 1024),
 
   RATE_LIMIT_JOB_POST_DAILY: z.coerce.number().int().default(3),
   RATE_LIMIT_JOB_POST_WEEKLY: z.coerce.number().int().default(10),

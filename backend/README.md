@@ -81,6 +81,23 @@ Root `docker-compose.yml` runs:
 
 Both `api` and `worker` read `backend/.env` and override `DATABASE_URL` and `REDIS_URL` to container hostnames.
 
+## Socket.IO Horizontal Scaling
+
+- Socket bootstrap: `src/app.ts`
+- Event contract helpers: `src/realtime/socket.events.ts`
+- Socket.IO Redis adapter is enabled via `SOCKET_IO_REDIS_ADAPTER_ENABLED=true`
+- API instances can scale horizontally and share room/event fan-out via Redis pub/sub
+
+Security and reliability guardrails:
+
+- Room joins are server-authorized using DB membership checks before `socket.join(...)`
+- Client-provided room IDs are validated and never trusted directly
+- Max inbound Socket.IO payload is enforced with `SOCKET_IO_MAX_HTTP_BUFFER_BYTES`
+- Per-event payload input is bounded by `SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES`
+- Messaging sockets now follow a notify-then-fetch pattern:
+  - emits lightweight `messaging.message.created` / `messaging.message.deleted`
+  - clients fetch full message bodies over REST
+
 ## Project Structure
 
 ```text
@@ -123,6 +140,9 @@ db/
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
 - `REDIS_URL`
+- `SOCKET_IO_REDIS_ADAPTER_ENABLED`
+- `SOCKET_IO_MAX_HTTP_BUFFER_BYTES`
+- `SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES`
 - `NOTIFICATIONS_USE_QUEUE`
 - `WORKER_CONCURRENCY`
 - `WORKER_METRICS_INTERVAL_MS`
