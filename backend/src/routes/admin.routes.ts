@@ -21,6 +21,7 @@ router.use(requireAuth, requireActive, requireRole('admin'));
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 router.get('/stats', ctrl.getStats);
+router.get('/cache/metrics', ctrl.getCacheMetrics);
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 

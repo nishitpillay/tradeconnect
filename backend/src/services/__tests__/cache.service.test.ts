@@ -1,6 +1,7 @@
 const mockRedis = {
   get: jest.fn(),
   set: jest.fn(),
+  hgetall: jest.fn(),
   smembers: jest.fn(),
   del: jest.fn(),
   pipeline: jest.fn(),
@@ -10,6 +11,9 @@ jest.mock('../../config/env', () => ({
   env: {
     CACHE_ENABLED: true,
     CACHE_METRICS_TTL_SECONDS: 3600,
+    CACHE_TTL_CATEGORY_DIRECTORY_SECONDS: 300,
+    CACHE_TTL_PROVIDER_PROFILE_SECONDS: 300,
+    CACHE_TTL_FEED_SUMMARY_SECONDS: 30,
     NODE_ENV: 'development',
     LOG_LEVEL: 'info',
   },
@@ -24,6 +28,7 @@ jest.mock('../../config/redis', () => ({
 }));
 
 import {
+  getCacheMetricsSnapshot,
   getOrSetJson,
   providerFeedSummaryCacheKey,
   providerProfileCacheKey,
@@ -79,5 +84,19 @@ describe('cache service', () => {
     const keyA = providerFeedSummaryCacheKey('p1', { limit: 10, sort: 'newest' });
     const keyB = providerFeedSummaryCacheKey('p1', { sort: 'newest', limit: 10 });
     expect(keyA).toEqual(keyB);
+  });
+
+  it('returns cache metrics snapshot with counters', async () => {
+    mockRedis.hgetall = jest.fn().mockResolvedValueOnce({
+      'category_directory:hit': '2',
+      'provider_profile:miss': '1',
+    });
+
+    const snapshot = await getCacheMetricsSnapshot();
+    expect(snapshot.enabled).toBe(true);
+    expect(snapshot.ttlSeconds.categoryDirectory).toBe(300);
+    expect(snapshot.counters['category_directory:hit']).toBe(2);
+    expect(snapshot.counters['provider_profile:miss']).toBe(1);
+    expect(snapshot.counters['feed_summary:hit']).toBe(0);
   });
 });

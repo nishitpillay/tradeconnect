@@ -215,6 +215,18 @@ redis-cli HGETALL tc:cache:metrics
 
 (`tc:` prefix depends on `QUEUE_PREFIX`.)
 
+Admin-only runtime metrics endpoint:
+
+- `GET /api/v1/admin/cache/metrics`
+
+Local cache smoke:
+
+```bash
+npm run smoke:cache
+```
+
+This calls public cached endpoints twice and verifies expected hit/miss deltas in Redis.
+
 ## Project Structure
 
 ```text

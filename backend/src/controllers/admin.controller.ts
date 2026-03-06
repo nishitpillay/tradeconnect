@@ -18,6 +18,15 @@ export async function getStats(_req: Request, res: Response, next: NextFunction)
   }
 }
 
+export async function getCacheMetrics(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const metrics = await adminService.getCacheMetrics();
+    res.json({ cache: metrics });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 export async function listUsers(req: Request, res: Response, next: NextFunction): Promise<void> {

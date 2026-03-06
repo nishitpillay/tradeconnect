@@ -18,6 +18,7 @@
     "dev:stack": "powershell -ExecutionPolicy Bypass -File scripts/dev-stack.ps1",
     "smoke:stack": "powershell -ExecutionPolicy Bypass -File scripts/smoke-stack.ps1",
     "smoke:queue": "tsx --env-file=.env src/scripts/queue-smoke.ts",
+    "smoke:cache": "tsx --env-file=.env src/scripts/cache-smoke.ts",
     "openapi:generate": "tsx src/scripts/generate-openapi.ts",
     "openapi:check-drift": "tsx src/scripts/check-openapi-drift.ts",
     "test:contract": "jest src/contracts/__tests__/api-response.contract.test.ts --runInBand",

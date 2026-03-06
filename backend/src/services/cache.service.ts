@@ -8,7 +8,8 @@ const log = contextualLogger({ component: 'cache' });
 const METRICS_KEY = 'cache:metrics';
 const TAG_SET_PREFIX = 'cache:tag:';
 
-type CacheNamespace = 'category_directory' | 'provider_profile' | 'feed_summary';
+export type CacheNamespace = 'category_directory' | 'provider_profile' | 'feed_summary';
+type CacheOutcome = 'hit' | 'miss';
 
 interface CacheSetOptions {
   namespace: CacheNamespace;
@@ -34,7 +35,7 @@ function hashParams(params: unknown): string {
   return createHash('sha1').update(stableSerialize(params)).digest('hex').slice(0, 16);
 }
 
-async function incrementCacheMetric(namespace: CacheNamespace, outcome: 'hit' | 'miss'): Promise<void> {
+async function incrementCacheMetric(namespace: CacheNamespace, outcome: CacheOutcome): Promise<void> {
   const field = `${namespace}:${outcome}`;
   await redis
     .pipeline()
@@ -92,6 +93,48 @@ export async function invalidateTags(tags: string[]): Promise<void> {
   for (const tag of tags) {
     await invalidateTag(tag);
   }
+}
+
+export interface CacheMetricsSnapshot {
+  enabled: boolean;
+  ttlSeconds: {
+    categoryDirectory: number;
+    providerProfile: number;
+    feedSummary: number;
+    metricsRetention: number;
+  };
+  counters: Record<`${CacheNamespace}:${CacheOutcome}`, number>;
+}
+
+export async function getCacheMetricsSnapshot(): Promise<CacheMetricsSnapshot> {
+  const counters: CacheMetricsSnapshot['counters'] = {
+    'category_directory:hit': 0,
+    'category_directory:miss': 0,
+    'provider_profile:hit': 0,
+    'provider_profile:miss': 0,
+    'feed_summary:hit': 0,
+    'feed_summary:miss': 0,
+  };
+
+  if (env.CACHE_ENABLED) {
+    const raw = await redis.hgetall(METRICS_KEY);
+    for (const [k, v] of Object.entries(raw)) {
+      if (k in counters) {
+        counters[k as keyof typeof counters] = Number.parseInt(v, 10) || 0;
+      }
+    }
+  }
+
+  return {
+    enabled: Boolean(env.CACHE_ENABLED),
+    ttlSeconds: {
+      categoryDirectory: env.CACHE_TTL_CATEGORY_DIRECTORY_SECONDS,
+      providerProfile: env.CACHE_TTL_PROVIDER_PROFILE_SECONDS,
+      feedSummary: env.CACHE_TTL_FEED_SUMMARY_SECONDS,
+      metricsRetention: env.CACHE_METRICS_TTL_SECONDS,
+    },
+    counters,
+  };
 }
 
 export function providerDirectoryCacheKey(slug: string, limit: number): string {

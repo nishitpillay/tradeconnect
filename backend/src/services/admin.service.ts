@@ -15,7 +15,7 @@ import * as jobRepo from '../repositories/job.repo';
 import { writeLog } from './audit.service';
 import { notify } from './notification.service';
 import { Errors, AppError } from '../middleware/errors';
-import { cacheTagForProvider, invalidateTag, invalidateTags } from './cache.service';
+import { cacheTagForProvider, getCacheMetricsSnapshot, invalidateTag, invalidateTags } from './cache.service';
 import type {
   ListUsersQuery,
   UpdateUserStatusInput,
@@ -31,6 +31,10 @@ import type { JobStatus } from '../repositories/job.repo';
 
 export async function getStats() {
   return adminRepo.getStats();
+}
+
+export async function getCacheMetrics() {
+  return getCacheMetricsSnapshot();
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
