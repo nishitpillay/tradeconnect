@@ -170,6 +170,51 @@ Security-focused tests added:
 - `src/config/__tests__/security.config.test.ts`
 - `src/middleware/__tests__/rateLimit.policy.test.ts`
 
+## Redis Caching Strategy
+
+TradeConnect caches only non-sensitive, read-heavy responses:
+
+- Category provider directory (`GET /api/v1/profiles/categories/:slug/providers`)
+- Public provider profile (`GET /api/v1/profiles/providers/:userId`)
+- Provider feed summaries (`GET /api/v1/jobs/feed`, short TTL)
+
+Anything auth/session/token related is intentionally not cached.
+
+### Cache Keys
+
+- `cache:providers-by-category:{slug}:{limit}`
+- `cache:provider:{userId}`
+- `cache:feed:{providerId}:{queryHash}`
+
+### TTLs
+
+- `CACHE_TTL_CATEGORY_DIRECTORY_SECONDS` (default `300`)
+- `CACHE_TTL_PROVIDER_PROFILE_SECONDS` (default `300`)
+- `CACHE_TTL_FEED_SUMMARY_SECONDS` (default `30`)
+
+### Invalidation Rules
+
+- Provider/customer/profile updates invalidate provider directory/profile cache tags.
+- Review + verification writes invalidate provider directory/profile cache tags.
+- Job lifecycle writes (`publish`, `patch`, `award`, `cancel`, etc.) invalidate feed summary cache tag.
+- Admin user/job status changes invalidate relevant provider/feed tags.
+
+### Cache Metrics (Hit/Miss)
+
+Cache hit/miss counters are tracked in Redis hash `cache:metrics` with fields:
+
+- `category_directory:hit`, `category_directory:miss`
+- `provider_profile:hit`, `provider_profile:miss`
+- `feed_summary:hit`, `feed_summary:miss`
+
+Quick check:
+
+```bash
+redis-cli HGETALL tc:cache:metrics
+```
+
+(`tc:` prefix depends on `QUEUE_PREFIX`.)
+
 ## Project Structure
 
 ```text
@@ -215,6 +260,11 @@ db/
 - `CORS_ORIGINS_STAGING`
 - `CORS_ORIGINS_PRODUCTION`
 - `REDIS_URL`
+- `CACHE_ENABLED`
+- `CACHE_TTL_CATEGORY_DIRECTORY_SECONDS`
+- `CACHE_TTL_PROVIDER_PROFILE_SECONDS`
+- `CACHE_TTL_FEED_SUMMARY_SECONDS`
+- `CACHE_METRICS_TTL_SECONDS`
 - `SOCKET_IO_REDIS_ADAPTER_ENABLED`
 - `SOCKET_IO_MAX_HTTP_BUFFER_BYTES`
 - `SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES`

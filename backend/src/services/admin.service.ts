@@ -15,6 +15,7 @@ import * as jobRepo from '../repositories/job.repo';
 import { writeLog } from './audit.service';
 import { notify } from './notification.service';
 import { Errors, AppError } from '../middleware/errors';
+import { cacheTagForProvider, invalidateTag, invalidateTags } from './cache.service';
 import type {
   ListUsersQuery,
   UpdateUserStatusInput,
@@ -94,6 +95,8 @@ export async function updateUserStatus(
     after:      { status: input.status, reason: input.reason },
   });
 
+  await invalidateTags([cacheTagForProvider(userId), 'provider-directory']);
+
   return updated!;
 }
 
@@ -140,6 +143,8 @@ export async function forceJobStatus(
     before:     { status: job.status },
     after:      { status: input.status, reason: input.reason },
   });
+
+  await invalidateTag('feed-summaries');
 
   return updated!;
 }

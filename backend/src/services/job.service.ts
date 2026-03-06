@@ -12,6 +12,7 @@ import * as jobRepo from '../repositories/job.repo';
 import { writeLog } from './audit.service';
 import { notify } from './notification.service';
 import { Errors } from '../middleware/errors';
+import { getOrSetJson, invalidateTag, providerFeedSummaryCacheKey } from './cache.service';
 import type {
   CreateJobInput,
   PatchJobInput,
@@ -65,6 +66,8 @@ export async function publishJob(customerId: string, jobId: string): Promise<Job
     after: { status: 'posted' },
   });
 
+  await invalidateFeedSummaries();
+
   return updated!;
 }
 
@@ -92,6 +95,8 @@ export async function patchJob(
     after: input as Record<string, unknown>,
   });
 
+  await invalidateFeedSummaries();
+
   return updated!;
 }
 
@@ -118,6 +123,8 @@ export async function submitQuote(
   if (job.status === 'posted') {
     await jobRepo.updateJobStatus(jobId, 'quoting');
   }
+
+  await invalidateFeedSummaries();
 
   notify({
     userId: job.customer_id,
@@ -182,6 +189,8 @@ export async function awardJob(
     after: { status: 'awarded', awarded_quote_id: quoteId },
   });
 
+  await invalidateFeedSummaries();
+
   return { job: awardedJob, revealed_address: decryptedAddress };
 }
 
@@ -217,6 +226,8 @@ export async function acceptJob(providerId: string, jobId: string): Promise<Job>
     before: { status: 'awarded' },
     after: { status: 'in_progress' },
   });
+
+  await invalidateFeedSummaries();
 
   return updated!;
 }
@@ -256,6 +267,8 @@ export async function completeJob(customerId: string, jobId: string): Promise<Jo
     before: { status: 'in_progress' },
     after: { status: 'completed' },
   });
+
+  await invalidateFeedSummaries();
 
   return updated!;
 }
@@ -314,7 +327,15 @@ export async function getProviderFeed(
   providerId: string,
   query: Omit<FeedQuery, 'provider_id'>
 ): Promise<{ jobs: Job[]; nextCursor: string | null }> {
-  return jobRepo.findProviderFeed({ ...query, provider_id: providerId });
+  return getOrSetJson(
+    providerFeedSummaryCacheKey(providerId, query),
+    env.CACHE_TTL_FEED_SUMMARY_SECONDS,
+    () => jobRepo.findProviderFeed({ ...query, provider_id: providerId }),
+    {
+      namespace: 'feed_summary',
+      tags: ['feed-summaries', `provider-feed:${providerId}`],
+    }
+  );
 }
 
 // ── List My Jobs (Customer) ───────────────────────────────────────────────────
@@ -467,6 +488,8 @@ export async function withdrawQuote(
     }
   }
 
+  await invalidateFeedSummaries();
+
   notify({
     userId: job.customer_id,
     type: 'quote_withdrawn',
@@ -486,6 +509,10 @@ export async function withdrawQuote(
   });
 
   return updated!;
+}
+
+async function invalidateFeedSummaries(): Promise<void> {
+  await invalidateTag('feed-summaries');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

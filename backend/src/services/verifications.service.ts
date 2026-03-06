@@ -3,6 +3,7 @@ import { Errors, AppError } from '../middleware/errors';
 import { notify } from './notification.service';
 import { writeLog } from './audit.service';
 import { generatePresignedPutUrl, mimeToExt, buildCdnUrl } from '../config/s3';
+import { cacheTagForProvider, invalidateTags } from './cache.service';
 import * as verificationsRepo from '../repositories/verifications.repo';
 import * as userRepo from '../repositories/user.repo';
 import * as profileRepo from '../repositories/profile.repo';
@@ -91,6 +92,8 @@ export async function submitVerification(
     targetId:   verification.id,
     after:      { verification_type: input.verification_type, s3_key: input.s3_key },
   });
+
+  await invalidateTags([cacheTagForProvider(providerId), 'provider-directory']);
 
   return verification;
 }
@@ -239,6 +242,8 @@ export async function reviewVerification(
       after:      { status: 'rejected', rejection_reason: rejectionReason },
     });
   }
+
+  await invalidateTags([cacheTagForProvider(providerId), 'provider-directory']);
 
   return updated;
 }

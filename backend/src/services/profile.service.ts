@@ -2,6 +2,14 @@ import * as profileRepo from '../repositories/profile.repo';
 import * as userRepo from '../repositories/user.repo';
 import { Errors } from '../middleware/errors';
 import { writeLog } from './audit.service';
+import { env } from '../config/env';
+import {
+  cacheTagForProvider,
+  getOrSetJson,
+  invalidateTags,
+  providerDirectoryCacheKey,
+  providerProfileCacheKey,
+} from './cache.service';
 import type { UpdateUserInput, UpdateProviderInput, UpdateCustomerInput, ToggleAvailabilityInput } from '../schemas/profile.schema';
 import type { UpdateNotificationPrefsInput } from '../schemas/auth.schema';
 
@@ -29,6 +37,10 @@ export async function getMyProfile(userId: string, role: string) {
 
 export async function updateMyProfile(userId: string, input: UpdateUserInput) {
   const updated = await profileRepo.updateUserFields(userId, input);
+  const providerProfile = await userRepo.findProviderProfile(userId);
+  if (providerProfile) {
+    await invalidateTags([cacheTagForProvider(userId), 'provider-directory']);
+  }
 
   writeLog({
     action: 'user_updated',
@@ -48,6 +60,7 @@ export async function updateProviderProfile(userId: string, input: UpdateProvide
   if (!existing) throw Errors.notFound('Provider profile not found');
 
   const updated = await profileRepo.updateProviderFields(userId, input);
+  await invalidateTags([cacheTagForProvider(userId), 'provider-directory']);
 
   writeLog({
     action: 'user_updated',
@@ -83,6 +96,7 @@ export async function updateCustomerProfile(userId: string, input: UpdateCustome
 
 export async function toggleAvailability(userId: string, input: ToggleAvailabilityInput) {
   const updated = await profileRepo.updateProviderFields(userId, { available: input.available });
+  await invalidateTags([cacheTagForProvider(userId), 'provider-directory']);
 
   writeLog({
     action: 'user_updated',
@@ -114,13 +128,29 @@ export async function updateNotificationPrefs(userId: string, input: UpdateNotif
 // ── GET /profiles/providers/:userId (public) ──────────────────────────────────
 
 export async function getPublicProviderProfile(userId: string) {
-  const profile = await profileRepo.getProviderPublicProfile(userId);
+  const profile = await getOrSetJson(
+    providerProfileCacheKey(userId),
+    env.CACHE_TTL_PROVIDER_PROFILE_SECONDS,
+    () => profileRepo.getProviderPublicProfile(userId),
+    {
+      namespace: 'provider_profile',
+      tags: ['provider-directory', cacheTagForProvider(userId)],
+    }
+  );
   if (!profile) throw Errors.notFound('Provider not found');
   return profile;
 }
 
 export async function getCategoryProviders(slug: string) {
-  return profileRepo.listProvidersByCategorySlug(slug);
+  return getOrSetJson(
+    providerDirectoryCacheKey(slug, 12),
+    env.CACHE_TTL_CATEGORY_DIRECTORY_SECONDS,
+    () => profileRepo.listProvidersByCategorySlug(slug),
+    {
+      namespace: 'category_directory',
+      tags: ['provider-directory', `category:${slug}`],
+    }
+  );
 }
 
 // ── GET /profiles/customers/:userId (authenticated, limited fields) ────────────

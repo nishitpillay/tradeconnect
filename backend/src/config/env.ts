@@ -61,6 +61,11 @@ const envSchema = z.object({
 
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   QUEUE_PREFIX: z.string().default('tc:'),
+  CACHE_ENABLED: envBoolean(true),
+  CACHE_TTL_CATEGORY_DIRECTORY_SECONDS: z.coerce.number().int().min(1).default(300),
+  CACHE_TTL_PROVIDER_PROFILE_SECONDS: z.coerce.number().int().min(1).default(300),
+  CACHE_TTL_FEED_SUMMARY_SECONDS: z.coerce.number().int().min(1).default(30),
+  CACHE_METRICS_TTL_SECONDS: z.coerce.number().int().min(60).default(86400),
   SOCKET_IO_REDIS_ADAPTER_ENABLED: envBoolean(true),
   SOCKET_IO_MAX_HTTP_BUFFER_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(256 * 1024),
   SOCKET_IO_MAX_EVENT_PAYLOAD_BYTES: z.coerce.number().int().min(256).max(512 * 1024).default(8 * 1024),

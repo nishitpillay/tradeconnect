@@ -2,6 +2,7 @@ import { env } from '../config/env';
 import { Errors } from '../middleware/errors';
 import { notify } from './notification.service';
 import { writeLog } from './audit.service';
+import { cacheTagForProvider, invalidateTags } from './cache.service';
 import * as jobRepo from '../repositories/job.repo';
 import * as reviewsRepo from '../repositories/reviews.repo';
 import type { Review } from '../repositories/reviews.repo';
@@ -82,6 +83,8 @@ export async function submitReview(
     after:      { reviewId: review.id, rating: input.rating },
   });
 
+  await invalidateTags([cacheTagForProvider(revieweeId), 'provider-directory']);
+
   return review;
 }
 
@@ -117,7 +120,9 @@ export async function respondToReview(
     throw Errors.badRequest('Already responded to this review');
   }
 
-  return reviewsRepo.setProviderResponse(reviewId, response);
+  const updated = await reviewsRepo.setProviderResponse(reviewId, response);
+  await invalidateTags([cacheTagForProvider(providerId), 'provider-directory']);
+  return updated;
 }
 
 // ── Hide Review (Admin) ───────────────────────────────────────────────────────
@@ -134,6 +139,8 @@ export async function adminHideReview(reviewId: string): Promise<Review> {
     targetId:   review.job_id,
     after:      { reviewId, is_hidden: true },
   });
+
+  await invalidateTags([cacheTagForProvider(review.reviewee_id), 'provider-directory']);
 
   return updated;
 }
