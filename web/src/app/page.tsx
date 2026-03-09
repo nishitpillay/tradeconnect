@@ -136,7 +136,9 @@ const PROCESS_STEPS = [
 ];
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-AU', {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Date unavailable';
+  return parsed.toLocaleDateString('en-AU', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -146,7 +148,14 @@ function formatDate(value: string): string {
 function formatRating(value: number | string | null): string {
   if (value == null) return 'No rating';
   const normalized = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(normalized)) return 'No rating';
   return `${normalized.toFixed(1)}/10`;
+}
+
+function safeText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
 export default function HomePage() {
@@ -165,18 +174,24 @@ export default function HomePage() {
       try {
         const response = await profilesAPI.listProvidersByCategory(selectedCategory.slug);
         if (!isCancelled) {
+          const providers = Array.isArray(response.providers) ? response.providers : [];
           setProviders(
-            response.providers.map((provider) => ({
+            providers.map((provider) => ({
               ...provider,
               avg_rating:
                 provider.avg_rating == null
                   ? null
                   : typeof provider.avg_rating === 'number'
-                    ? provider.avg_rating
-                    : Number(provider.avg_rating),
-              recent_reviews: provider.recent_reviews.map((review) => ({
+                    ? (Number.isFinite(provider.avg_rating) ? provider.avg_rating : null)
+                    : (Number.isFinite(Number(provider.avg_rating)) ? Number(provider.avg_rating) : null),
+              categories: Array.isArray(provider.categories) ? provider.categories : [],
+              recent_reviews: (Array.isArray(provider.recent_reviews) ? provider.recent_reviews : []).map((review) => ({
                 ...review,
-                rating: typeof review.rating === 'number' ? review.rating : Number(review.rating),
+                reviewer_name: safeText(review.reviewer_name, 'TradeConnect user'),
+                body: safeText(review.body, ''),
+                rating: Number.isFinite(typeof review.rating === 'number' ? review.rating : Number(review.rating))
+                  ? (typeof review.rating === 'number' ? review.rating : Number(review.rating))
+                  : 0,
               })),
             }))
           );
@@ -493,22 +508,25 @@ export default function HomePage() {
                         </div>
 
                         <h4 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
-                          {provider.business_name || provider.display_name || provider.full_name}
+                          {safeText(provider.business_name) || safeText(provider.display_name) || safeText(provider.full_name, 'TradeConnect provider')}
                         </h4>
                         <p className="mt-1 text-sm text-slate-500">
-                          {provider.display_name || provider.full_name}
+                          {safeText(provider.display_name) || safeText(provider.full_name, 'TradeConnect provider')}
                         </p>
 
-                        {provider.bio ? (
-                          <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600">{provider.bio}</p>
+                        {safeText(provider.bio) ? (
+                          <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600">{safeText(provider.bio)}</p>
                         ) : null}
 
                         <div className="mt-5 flex flex-wrap gap-2">
-                          {provider.categories.map((label) => (
-                            <span key={label} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
-                              {label}
-                            </span>
-                          ))}
+                          {provider.categories.map((label) => {
+                            const text = safeText(label, 'General');
+                            return (
+                              <span key={`${provider.user_id}-${text}`} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
+                                {text}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
 

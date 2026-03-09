@@ -4,10 +4,11 @@ const path = require('path');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '..');
+const sharedPackageRoot = path.resolve(workspaceRoot, 'packages', 'shared');
 const config = getDefaultConfig(projectRoot);
 
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
-config.watchFolders = [workspaceRoot];
+config.watchFolders = [sharedPackageRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),

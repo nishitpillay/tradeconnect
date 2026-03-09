@@ -12,7 +12,7 @@ const webEnvSchema = z.object({
 
 type WebEnv = z.infer<typeof webEnvSchema>;
 
-function parseWebEnv(source: NodeJS.ProcessEnv): WebEnv {
+function parseWebEnv(source: { NODE_ENV?: string; NEXT_PUBLIC_API_BASE_URL?: string }): WebEnv {
   const parsed = webEnvSchema.safeParse(source);
   if (parsed.success) return parsed.data;
 
@@ -23,4 +23,9 @@ function parseWebEnv(source: NodeJS.ProcessEnv): WebEnv {
   throw new Error(`Web environment configuration is invalid:\n${issues}`);
 }
 
-export const webEnv = parseWebEnv(process.env);
+const runtimeEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+};
+
+export const webEnv = parseWebEnv(runtimeEnv);
